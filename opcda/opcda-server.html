@@ -1,0 +1,63 @@
+<script type="text/html" data-template-name="opcda-server">
+	<div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tasks"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-address"><i class="fa fa-rss"></i> Address</label>
+        <input type="text" id="node-config-input-address" placeholder="x.x.x.x or Hostname">
+    </div>
+	<div class="form-row">
+        <label for="node-config-input-domain"><i class="fa fa-sitemap"></i> Domain</label>
+        <input type="text" id="node-config-input-domain" placeholder="Domain">
+    </div>
+	<div class="form-row">
+        <label for="node-config-input-username"><i class="fa fa-user"></i> User Name</label>
+        <input type="text" id="node-config-input-username" placeholder="Name">
+    </div>
+	<div class="form-row">
+        <label for="node-config-input-password"><i class="fa fa-key"></i> Password</label>
+        <input type="password" id="node-config-input-password" placeholder="Password">
+    </div>
+	<div class="form-row">
+        <label for="node-config-input-clsid"><i class="fa fa-tasks"></i> ClsId</label>
+        <input type="text" id="node-config-input-clsid" placeholder="ClsId">
+    </div>
+	<div class="form-row">
+		<label for="node-config-input-timeout"><i class="fa fa-refresh"></i> Timeout</label>
+		<input type="text" id="node-config-input-timeout" style="width: 60px;" placeholder="5000"> <span>ms</span>
+	</div>
+	<div class="form-row">
+		<a href="#" class="editor-button" id="node-config-opc-da-server-test" style="margin: 4px"><i class="fa fa-plug"></i> Browse Items</a>
+		<p class="form-tips" id="node-config-opc-da-server-rest-result"></p>
+	</div>
+</script>
+
+<script type="text/html" data-help-name="opcda-server">
+    <p>A simple node that converts the message payloads into all lower-case characters</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('opcda-server',{
+        category: 'config',
+        defaults: {
+			name: {value: ""},
+            address: {value: "", required: true},
+			domain: {value: "", required: true},
+			clsid: {value: "", required: true},
+			timeout: {value: "", required: true}
+        },
+		credentials: {
+			username: { type: "text", required: true },
+			password: { type: "password", required: true }
+		},
+        label: function() {
+            return this.name||"opcda-server";
+        },
+		oneditprepare: function () {
+		},
+		oneditsave: function () {
+
+		}
+    });
+</script>

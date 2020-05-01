@@ -1,0 +1,99 @@
+<script type="text/html" data-template-name="opcda-in">
+	<div class="form-row">
+        <label for="node-input-server"><i class="fa fa-object-group"></i> OPC DA Server</label>
+        <input id="node-input-server" placeholder="Select OPC DA Server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Group Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+	<div class="form-row">
+		<label for="node-input-updaterate"><i class="fa fa-refresh"></i> Update Rate</label>
+		<input type="text" id="node-input-updaterate" placeholder="1000" style="width: 60px;"> <span>ms</span>
+	</div>
+	<div class="form-row">
+		<label for="node-input-deadband"><i class="fa fa-arrows-h"></i> Dead Band</label>
+		<input type="text" id="node-input-deadband" placeholder="0" style="width: 60px;"> <span>%</span>
+	</div>
+	<div class="form-row">
+		<input type="checkbox" id="node-input-cache" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="cache"> <span>Read from server cache</span>
+	</div>
+	<div class="form-row">
+		<input type="checkbox" id="node-input-validate" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="validate"> <span>Validate Items</span>
+	</div>
+	<div class="form-row" style="margin-bottom:0;">
+		<label><i class="fa fa-list"></i> <span>Group Items</span></label>
+	</div>
+	<div class="form-row" style="margin-bottom:0;">
+		<input type="text" id="node-group-item">
+		<button class="editor-button" id="node-btn-group-item-add"><i class="fa fa-plus"></i></button>
+	</div>
+	<div class="form-row node-input-item-container-row">
+		<ol id="node-input-items-container" style="list-style-position:inside; margin:0; padding: 5px; height: 300px; border:1px solid #cccccc; overflow:scroll"></ol>
+	</div>
+</script>
+
+<script type="text/html" data-help-name="opcda-in">
+    <p>A simple node that converts the message payloads into all lower-case characters</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('opcda-in',{
+        category: 'input',
+        color: '#a6bbcf',
+        defaults: {
+			server: {value: "", type: "opcda-server", required: true},
+            name: {value: ""},
+			updaterate: {value: ""},
+			deadband: {value: ""},
+			cache: {value: false},
+			validate: {value: false},
+			groupItems: {value: []}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "feed.png",
+        label: function() {
+            return this.name||"opcda-in";
+        },
+		oneditprepare: function () {
+			let node = this;
+			
+			node.groupItems.forEach(function(item) {addGroupItem(item)}); 
+				
+			$("#node-btn-group-item-add").click(function(){
+				var item = $("#node-group-item").val();
+				if(item){
+					if(node.groupItems.includes(item)){
+						alert("Same item name cannot be added multiple times.");
+						return;
+					}
+					addGroupItem(item);
+				}
+			});
+			
+			function addGroupItem(item){
+				var removeButton = $("<button class='node-btn-group-item-remove'><i class='fa fa-times' aria-hidden='true'></i></button>").css({"position":"absolute","right":"0","margin-right":"15px","border":"0","background":"#fff"});
+				var listItem = $("<li><span>"+ item + "</span></li>").css({"border":"1px solid #cccccc", "padding" : "10px 0 10px 10px", "margin-top" : "2px", "position":"relative", "background-color":"#fff"});
+				listItem.append(removeButton);
+				
+				removeButton.click(function(){
+					node.groupItems.splice($(this).parent().index(), 1);
+					$(this).parent().remove();
+				});
+				
+				$("#node-input-items-container").append(listItem);
+				$("#node-input-items-container").css({"list-style-position":"inside","margin":"0"});
+			};
+		},
+		oneditsave: function(){
+			let node = this;
+			
+			node.groupItems = [];
+			var items = $('#node-input-items-container').children('li');
+			items.each(function (i) {
+				node.groupItems.push($(this).text());
+			});
+		}
+    });
+</script>
