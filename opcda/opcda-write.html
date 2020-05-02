@@ -1,0 +1,37 @@
+<script type="text/html" data-template-name="opcda-write">
+	<div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input id="node-input-server" placeholder="Select OPC DA Server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Group Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+	<div class="form-row">
+        <label for="node-input-groupitem"><i class="fa fa-tag"></i> Item ID</label>
+        <input type="text" id="node-input-groupitem" placeholder="Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="opcda-write">
+    <p>A simple node that converts the message payloads into all lower-case characters</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('opcda-write',{
+        category: 'opcda',
+        color: '#a6bbcf',
+        defaults: {
+			server: {value: "", type: "opcda-server", required: true},
+            name: {value: ""},
+			groupitem: {value: "", required: true},
+        },
+        inputs:1,
+        outputs:1,
+        icon: "serial.png",
+		align: 'right',
+        label: function() {
+            return this.name||"opcda-write";
+        }
+    });
+</script>

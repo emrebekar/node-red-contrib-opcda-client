@@ -24,12 +24,19 @@
         <input type="text" id="node-config-input-clsid" placeholder="ClsId">
     </div>
 	<div class="form-row">
-		<label for="node-config-input-timeout"><i class="fa fa-refresh"></i> Timeout</label>
-		<input type="text" id="node-config-input-timeout" style="width: 60px;" placeholder="5000"> <span>ms</span>
+		<div style="display:inline">
+			<label for="node-config-input-timeout"><i class="fa fa-refresh"></i> Timeout</label>
+			<input type="text" id="node-config-input-timeout" style="width: 60px;" placeholder="5000"> <span>ms</span>
+		</div>
+	</div>
+
+	<div class="form-row">
+		<button class="editor-button" id="node-config-btn-item-browse"><i class="fa fa-search"></i> Browse</button>
+		<button href="#" class="editor-button" id="node-config-btn-item-export" style="margin: 4px"><i class="fa fa-download"></i> Export</button>
 	</div>
 	<div class="form-row">
-		<a href="#" class="editor-button" id="node-config-opc-da-server-test" style="margin: 4px"><i class="fa fa-plug"></i> Browse Items</a>
-		<p class="form-tips" id="node-config-opc-da-server-rest-result"></p>
+		<p class="form-tips" id="node-config-alert"></p>
+		<ol id="node-config-item-list" style="list-style-position:inside; margin:0; padding: 5px; height: 300px; border:1px solid #cccccc; overflow:scroll"></ol>
 	</div>
 </script>
 
@@ -45,7 +52,7 @@
             address: {value: "", required: true},
 			domain: {value: "", required: true},
 			clsid: {value: "", required: true},
-			timeout: {value: "", required: true}
+			timeout: {value: 5000},
         },
 		credentials: {
 			username: { type: "text", required: true },
@@ -55,6 +62,78 @@
             return this.name||"opcda-server";
         },
 		oneditprepare: function () {
+			let browseBtn = $('#node-config-btn-item-browse');
+			let browseBtnIcon = browseBtn.children('i');
+			let exportBtn = $('#node-config-btn-item-export');
+			let exportBtnIcon = exportBtn.children('i');
+			let alertArea = $('#node-config-alert');
+			let itemList = $('#node-config-item-list');
+			
+			console.log(this.credentials);
+			
+			$("#node-config-input-timeout").spinner().val(5000);
+			
+			itemList.hide();
+			alertArea.hide();
+			alertArea.empty();
+			exportBtn.addClass('disabled').attr('disabled', 'disabled');
+
+			browseBtn.click(function(){
+				itemList.hide();
+				alertArea.hide();
+				alertArea.empty();
+								
+				browseBtn.addClass('disabled').attr('disabled', 'disabled');
+				browseBtnIcon.removeClass('fa-search').addClass('fa-spinner fa-spin fa-fw');
+				exportBtn.addClass('disabled').attr('disabled', 'disabled');
+								
+				var queryData = {
+					address: $('#node-config-input-address').val(),
+					domain: $('#node-config-input-domain').val(),
+					username: $('#node-config-input-username').val(),
+					password: $('#node-config-input-password').val(),
+					clsid: $('#node-config-input-clsid').val(),
+					timeout: $('#node-config-input-timeout').val()
+				};
+				
+				console.log(queryData);
+
+				$.get("opcda/browse", queryData)
+				.done(function( data, status, jqXHR ) {
+					alertArea.text(data.items.length + ' items found');
+					$.each(data.items, function(i, item){
+						$('<li/>').text(item).appendTo(itemList);
+					});
+					
+					itemList.show();
+					exportBtn.removeClass('disabled').removeAttr('disabled');
+
+				})
+				.fail(function( jqXHR, status, errorThrown ) {
+					alertArea.text(jqXHR.responseJSON.error);
+				})
+				.always(function(){
+					browseBtnIcon.removeClass('fa-spinner fa-spin fa-fw').addClass('fa-search');
+					browseBtn.removeClass('disabled').removeAttr('disabled');
+					alertArea.show();
+				});
+			});
+			
+			exportBtn.click(function(){
+				var items = itemList.children('li');
+				var itemData = [];
+				
+				items.each(function (i) {
+					itemData.push($(this).text());
+				});
+
+				var jsonData = "text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(itemData, null, 4));
+				console.log();
+				const a = document.createElement('a');
+				a.href = 'data:' + jsonData;				
+				a.download = 'export.json';
+				a.click();
+			});			
 		},
 		oneditsave: function () {
 

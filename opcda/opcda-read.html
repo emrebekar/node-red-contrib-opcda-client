@@ -1,0 +1,161 @@
+<script type="text/html" data-template-name="opcda-read">
+	<div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input id="node-input-server" placeholder="Select OPC DA Server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Group Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+	<div class="form-row">
+		<div>
+			<div style="display:inline">
+				<label for="node-input-updaterate"><i class="fa fa-refresh"></i> Update Rate</label>
+				<input type="text" id="node-input-updaterate" placeholder="1000" style="width:60px"> <span>ms</span>
+			</div>
+			<div style="display:inline; float:right;">
+				<span><i class="fa fa-clock-o"></i> Retry</span>
+				<input type="text" id="node-input-retry" placeholder="0" style="width:60px"> <span>times</span>
+			</div>
+		</div>
+	</div>
+	<div class="form-row">
+		<input type="checkbox" id="node-input-cache" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="cache"> <span>Cache Read</span>
+	</div>
+	<div class="form-row">
+		<input type="checkbox" id="node-input-datachange" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="validate"> <span>Data Change</span>
+	</div>
+	<div class="form-row">
+		<label><i class="fa fa-list"></i> Items</label>
+	</div>
+	<div class="form-row">
+		<input id="node-file-item" type="file" name="filename" accept="application/JSON" style="display:none"/>
+		<button class="editor-button" id="node-btn-item-import"><i class="fa fa-upload"></i> Import</button>
+		<button class="editor-button" id="node-btn-item-export"><i class="fa fa-download"></i> Export</button>
+		<button class="editor-button" id="node-btn-item-remove"><i class="fa fa-trash"></i> Remove All</button>
+	</div>
+	<div class="form-row" style="margin-bottom:0;">
+		<input type="text" id="node-field-item-add">
+		<button class="editor-button" id="node-btn-item-add"><i class="fa fa-plus"></i></button>
+	</div>
+	<div class="form-row node-input-item-container-row">
+		<ol id="node-input-items-container" style="list-style-position:inside; margin:0; padding: 5px; height: 300px; border:1px solid #cccccc; overflow:scroll"></ol>
+	</div>
+</script>
+
+<script type="text/html" data-help-name="opcda-read">
+    <p>A simple node that converts the message payloads into all lower-case characters</p>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('opcda-read',{
+        category: 'opcda',
+        color: '#a6bbcf',
+        defaults: {
+			server: {value: "", type: "opcda-server", required: true},
+            name: {value: ""},
+			updaterate: {value: 1000},
+			retry: {value: 10},
+			cache: {value: false},
+			datachange: {value: false},
+			groupitems: {value: []},
+        },
+        inputs:1,
+        outputs:1,
+        icon: "serial.png",
+		align: 'left',
+        label: function() {
+            return this.name||"opcda-read";
+        },
+		oneditprepare: function () {
+			let self = this;
+			
+			let importBtn = $("#node-btn-item-import");
+			let exportBtn = $("#node-btn-item-export");
+			let removeBtn = $("#node-btn-item-remove");	
+			let addBtn = $("#node-btn-item-add");
+			let addField = $("#node-field-item-add");
+			let itemFile = $("#node-file-item");	
+			let itemArea = $("#node-input-items-container");
+			
+			$("#node-input-updaterate").spinner({
+				min: 100
+			}).val(self.updaterate || 1000);
+						
+			$("#node-input-retry").spinner().val(self.retry || 10);
+			
+			self.groupitems.forEach(function(item) {addGroupItem(item)}); 
+			
+			importBtn.click(function(){
+				itemFile.click();
+			});
+			
+			exportBtn.click(function(){
+				var items = itemArea.children('li');
+				var itemData = [];
+				
+				items.each(function (i) {
+					itemData.push($(this).text());
+				});
+
+				var jsonData = "text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(itemData, null, 4));
+				console.log();
+				const a = document.createElement('a');
+				a.href = 'data:' + jsonData;				
+				a.download = 'export.json';
+				a.click();
+			
+			});
+			
+			removeBtn.click(function(){
+				itemArea.empty();
+			});
+			
+			addField.keypress(function (e) {
+				if(e.which == 13) { 
+					addBtn.click();
+					return false;
+				}
+			});
+			
+			addBtn.click(function(){
+				var item = $("#node-field-item-add").val();
+				if(item){
+					addGroupItem(item);
+				}
+			});
+			
+			function addGroupItem(item){
+				var removeItemBtn = $("<button class='node-btn-group-item-remove' style='position:absolute; right:10px; color:#888; border:0; background:none'><i class='fa fa-times' aria-hidden='true'></i></button>");
+				var item = $("<li><span>"+ item + "</span></li>").css({"border":"1px solid #cccccc", "padding" : "10px 0 10px 10px", "margin-top" : "2px", "position":"relative", "background-color":"#fff"});
+				item.append(removeItemBtn);
+				
+				removeItemBtn.click(function(){
+					$(this).parent().remove();
+				});
+				
+				itemArea.append(item);
+				itemArea.css({"list-style-position":"inside","margin":"0"});
+			};
+			
+			itemFile.change(function(file){
+				const reader = new FileReader();
+				reader.onload = function() {
+					var items = JSON.parse(reader.result);
+					items.forEach(function(item) {addGroupItem(item)}); 
+				};
+				
+				reader.readAsText(file.target.files[0]);
+			});
+		},
+		oneditsave: function(){
+			let self = this;
+			
+			self.groupitems = [];
+			var items = $('#node-input-items-container').children('li');
+			items.each(function (i) {
+				self.groupitems.push($(this).text());
+			});
+		}
+    });
+</script>
