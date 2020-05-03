@@ -22,6 +22,22 @@ module.exports = function(RED) {
 		0x0004000D : "The server does not support the requested data rate but will use the closest available rate.",
 		0x00000061 : "Clsid syntax is invalid"
 	};
+	
+	const types = {
+		"double" : opcda.dcom.Types.DOUBLE,
+		"short" : opcda.dcom.Types.SHORT,
+		"integer" : opcda.dcom.Types.INTEGER,
+		"float" : opcda.dcom.Types.FLOAT,
+		"byte" : opcda.dcom.Types.BYTE,
+		"long" : opcda.dcom.Types.LONG,
+		"boolean" : opcda.dcom.Types.BOOLEAN,
+		"uuid" : opcda.dcom.Types.UUID,
+		"string" : opcda.dcom.Types.STRING,
+		"char" : opcda.dcom.Types.CHARACTER,
+		"date" : opcda.dcom.Types.DATE,
+		"currency" : opcda.dcom.Types.CURRENCY,
+		"array" : opcda.dcom.Types.ARRAY
+	};
     
 	function OPCDAWrite(config) {
         RED.nodes.createNode(this,config);
@@ -33,7 +49,6 @@ module.exports = function(RED) {
 		let opcItemMgr, opcSyncIO, opcGroup, serverHandle;
 		
 		let writing = false;
-		let unsuccessfulWrite = 0;
 		
 		if(!serverNode){
 			updateStatus("grouperror");
@@ -58,7 +73,7 @@ module.exports = function(RED) {
 				opcItemMgr = await createdGroup.getItemManager();
 				opcSyncIO = await createdGroup.getSyncIO();
 				
-				var item = [{itemID: config.groupitem, clientHandle: 1}];
+				var item = [{itemID: config.itemid, clientHandle: 1}];
 				var addedItems = await opcItemMgr.add(item);
 				var addedItem = addedItems[0];
 				
@@ -70,11 +85,11 @@ module.exports = function(RED) {
 				}
 						
 				updateStatus('ready');
-				unsuccessfulRead = 0;
 			}
 			catch(e){
 				updateStatus('grouperror');
                 onError(e);
+				serverNode.reconnect();
 			}
 		}
 	
@@ -108,13 +123,18 @@ module.exports = function(RED) {
 								
 				await opcSyncIO.write(object);
 				
+				var msg = { payload: true };
+				node.send(msg);	
+				
 				updateStatus("ready");
-				unsuccessfulWrite = 0;
 			}
 			catch(e){
-				unsuccessfulWrite++;
 				updateStatus('writeerror');
-                onError(e);
+				
+				var msg = { payload: false };
+				node.send(msg);	
+                
+				onError(e);
 			}
 			finally{
 				writing = false;
@@ -155,13 +175,6 @@ module.exports = function(RED) {
 			var msg = errorMessage(e);
 			node.error(msg);
 			console.log(e);
-
-			
-			unsuccessfulWrite++;
-			if(unsuccessfulWrite > parseInt(config.retry)){
-				serverNode.reconnect();
-				unsuccessfulWrite = 0;
-			}
 		}
 		
 		function errorMessage(e){
@@ -171,12 +184,7 @@ module.exports = function(RED) {
 		
 		node.on('input', function(msg){
 			if(serverNode.isConnected && !writing){
-				writeGroup(msg.payload);
-				//console.log(msg.payload);
-			}
-			
-			else{
-				onError(new Error("Reading is unsuccesful."));
+				writeGroup(msg.payload);	
 			}
         });	
 	

@@ -71,14 +71,23 @@ module.exports = function(RED) {
             return node.error("Failed to load credentials!");
         }	
 
-		let connecting = false;
+		let busy = false;
 		let opcServer, comSession, comServer;
 		node.isConnected = false;
 		
 		init();
 		
+		setInterval(function(){
+			if(!busy){
+				opcServer.getStatus().catch(function(e){
+					node.reconnect();
+				});
+			}
+		}, 1000);
+		
 		async function init(){
 			try{
+				busy = true;
 				await updateStatus('connecting');
 				var timeout = parseInt(config.timeout);
 			
@@ -101,17 +110,19 @@ module.exports = function(RED) {
 				opcServer = new OPCServer();		
 				await opcServer.init(comObject);
 				
-				node.isConnected = true;
-				connecting = false;
-								
+				node.isConnected = true;								
 				await createGroups();
 			}
 			catch(e){
 				onError(e);
 			}
+			finally{
+				busy = false;
+			}
 		}
 				
 		async function destroy(){
+			busy = true;
 			try{
 				if(opcServer){
 					await opcServer.end();
@@ -134,6 +145,7 @@ module.exports = function(RED) {
 			}
 			finally{
 				node.isConnected = false;
+				busy = false;
 			}
 		}
 		
@@ -170,7 +182,6 @@ module.exports = function(RED) {
 		}
 		
 		function onError(e){
-			console.log(e);
 			updateStatus('servererror');
 			node.isConnected = false;
 			var msg = errorMessage(e);

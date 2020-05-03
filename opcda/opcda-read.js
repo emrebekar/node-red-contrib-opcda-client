@@ -34,7 +34,6 @@ module.exports = function(RED) {
 		let opcSyncIO, opcItemMgr, opcGroup, serverHandles, clientHandles;
 		
 		let reading = false;
-		let unsuccessfulRead = 0;
 		
 		if(!serverNode){
 			updateStatus("grouperror");
@@ -82,11 +81,11 @@ module.exports = function(RED) {
 				}
 				
 				updateStatus('ready');
-				unsuccessfulRead = 0;
 			}
 			catch(e){
 				updateStatus('grouperror');
                 onError(e);
+				serverNode.reconnect();
 			}
 		}
 	
@@ -151,7 +150,6 @@ module.exports = function(RED) {
 					
 					if(config.datachange){
 						oldValues = valuesTmp;
-						console.log(valuesTmp);
 						if(changed){
 							var msg = { payload: datas };
 							node.send(msg);						
@@ -163,11 +161,9 @@ module.exports = function(RED) {
 					}
 
 					updateStatus('ready');
-					unsuccessfulRead = 0;
 				});
 			}
 			catch(e){
-				unsuccessfulRead++;
 				updateStatus('readerror');
                 onError(e);
 			}
@@ -209,12 +205,6 @@ module.exports = function(RED) {
 		function onError(e){
 			var msg = errorMessage(e);
 			node.error(msg);
-			
-			unsuccessfulRead++;
-			if(unsuccessfulRead > parseInt(config.retry)){
-				serverNode.reconnect();
-				unsuccessfulRead = 0;
-			}
 		}
 		
 		function errorMessage(e){
@@ -225,10 +215,6 @@ module.exports = function(RED) {
 		node.on('input', function(msg){
 			if(serverNode.isConnected && !reading){
 				readGroup(config.cache);
-			}
-			
-			else{
-				onError(new Error("Reading is unsuccesful."));
 			}
         });	
 	

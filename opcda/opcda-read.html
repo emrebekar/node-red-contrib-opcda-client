@@ -8,18 +8,6 @@
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
 	<div class="form-row">
-		<div>
-			<div style="display:inline">
-				<label for="node-input-updaterate"><i class="fa fa-refresh"></i> Update Rate</label>
-				<input type="text" id="node-input-updaterate" placeholder="1000" style="width:60px"> <span>ms</span>
-			</div>
-			<div style="display:inline; float:right;">
-				<span><i class="fa fa-clock-o"></i> Retry</span>
-				<input type="text" id="node-input-retry" placeholder="0" style="width:60px"> <span>times</span>
-			</div>
-		</div>
-	</div>
-	<div class="form-row">
 		<input type="checkbox" id="node-input-cache" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="cache"> <span>Cache Read</span>
 	</div>
 	<div class="form-row">
@@ -55,7 +43,6 @@
 			server: {value: "", type: "opcda-server", required: true},
             name: {value: ""},
 			updaterate: {value: 1000},
-			retry: {value: 10},
 			cache: {value: false},
 			datachange: {value: false},
 			groupitems: {value: []},
@@ -81,9 +68,7 @@
 			$("#node-input-updaterate").spinner({
 				min: 100
 			}).val(self.updaterate || 1000);
-						
-			$("#node-input-retry").spinner().val(self.retry || 10);
-			
+									
 			self.groupitems.forEach(function(item) {addGroupItem(item)}); 
 			
 			importBtn.click(function(){
@@ -99,7 +84,6 @@
 				});
 
 				var jsonData = "text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(itemData, null, 4));
-				console.log();
 				const a = document.createElement('a');
 				a.href = 'data:' + jsonData;				
 				a.download = 'export.json';
