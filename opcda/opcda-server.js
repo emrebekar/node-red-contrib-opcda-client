@@ -65,7 +65,7 @@ module.exports = function(RED) {
         RED.nodes.createNode(this,config);
         const node = this;
 		
-		let groupNodes = [];
+		let groupNodes = new Map();
 		
 		if (!node.credentials) {
             return node.error("Failed to load credentials!");
@@ -78,7 +78,7 @@ module.exports = function(RED) {
 		init();
 		
 		setInterval(function(){
-			if(!busy){
+			if(node.isConnected && !busy){
 				opcServer.getStatus().catch(function(e){
 					node.reconnect();
 				});
@@ -150,8 +150,8 @@ module.exports = function(RED) {
 		}
 		
 		async function createGroups(){
-			for(i in groupNodes){
-				var groupNode = groupNodes[i];
+			for(entry of groupNodes.entries()){
+				var groupNode = entry[1];
 
 				var opts = {
 					updateRate: parseInt(groupNode.config.updaterate)
@@ -194,7 +194,7 @@ module.exports = function(RED) {
 		}
 		
 		node.addGroupNode = async function registerGroup(object){
-			groupNodes.push(object);
+			groupNodes.set(object.config.id, object);
 		}
 		
 		node.on('close', function(){

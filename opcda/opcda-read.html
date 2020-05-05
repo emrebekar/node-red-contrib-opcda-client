@@ -111,7 +111,7 @@
 			
 			function addGroupItem(item){
 				var removeItemBtn = $("<button class='node-btn-group-item-remove' style='position:absolute; right:10px; color:#888; border:0; background:none'><i class='fa fa-times' aria-hidden='true'></i></button>");
-				var item = $("<li><span>"+ item + "</span></li>").css({"border":"1px solid #cccccc", "padding" : "10px 0 10px 10px", "margin-top" : "2px", "position":"relative", "background-color":"#fff"});
+				var item = $("<li><span>"+ item + "</span></li>").css({"border":"1px solid #cccccc", "padding" : "10px 0 10px 10px", "margin-top" : "2px", "position":"relative"});
 				item.append(removeItemBtn);
 				
 				removeItemBtn.click(function(){
