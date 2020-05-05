@@ -23,7 +23,7 @@ module.exports = function(RED) {
 		0x00000061 : "Clsid syntax is invalid"
 	};
 	
-	const types = {
+	const itemTypes = {
 		"double" : opcda.dcom.Types.DOUBLE,
 		"short" : opcda.dcom.Types.SHORT,
 		"integer" : opcda.dcom.Types.INTEGER,
@@ -55,7 +55,7 @@ module.exports = function(RED) {
 			node.error("Please select a server.")
 			return;
 		}
-		
+				
 		serverNode.addGroupNode(this);
 		
 		if(serverNode.isConnected){
@@ -118,7 +118,7 @@ module.exports = function(RED) {
 				var object = [{
 					value: value,
 					handle: serverHandle,
-					type: opcda.dcom.Types.INTEGER
+					type: itemTypes[config.itemtype]
 				}];
 								
 				await opcSyncIO.write(object);
