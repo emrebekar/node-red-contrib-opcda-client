@@ -137,10 +137,25 @@ module.exports = function(RED) {
 							valuesTmp[i] = valueSets[i].value;					
 						}
 						
+						var quality;
+						
+						if(valueSets[i].quality >= 0 && valueSets[i].quality < 64){
+							quality = "BAD";
+						}
+						else if(valueSets[i].quality >= 64 && valueSets[i].quality < 192){
+							quality = "UNCERTAIN";
+						}
+						else if(valueSets[i].quality >= 19 && valueSets[i].quality <= 219){
+							quality = "GOOD";
+						}
+						else{
+							quality = "UNKNOWN";
+						}
+						
 						var data = {
 							itemID: clientHandles[valueSets[i].clientHandle],
 							errorCode: valueSets[i].errorCode,
-							quality: valueSets[i].quality,
+							quality: quality,
 							timestamp: valueSets[i].timestamp,
 							value: valueSets[i].value
 						}
@@ -159,8 +174,14 @@ module.exports = function(RED) {
 						var msg = { payload: datas };
 						node.send(msg);		
 					}
+					
+					if(config.groupitems.length == valuesTmp.length){
+						updateStatus('ready');
+					}
+					else{
+						updateStatus('mismatch');
+					}
 
-					updateStatus('ready');
 				});
 			}
 			catch(e){
@@ -195,6 +216,9 @@ module.exports = function(RED) {
 					break;
 				case "readerror":
 					node.status({fill:"red",shape:"ring",text:"Read Error"});
+					break;
+				case "mismatch":
+					node.status({fill:"red",shape:"ring",text:"Mismatch"});
 					break;
 				default:
 					node.status({fill:"grey",shape:"ring",text:"Unknown"});
