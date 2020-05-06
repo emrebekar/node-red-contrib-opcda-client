@@ -64,22 +64,24 @@ module.exports = function(RED) {
     function OPCDAServer(config) {
         RED.nodes.createNode(this,config);
         const node = this;
-		
-		let groupNodes = new Map();
-		
+				
 		if (!node.credentials) {
             return node.error("Failed to load credentials!");
         }	
 
 		let busy = false;
-		let opcServer, comSession, comServer;
+		let comSession, comServer;
+		let groupNodes = new Map();
+		
 		node.isConnected = false;
+		serverStatusChanged(false);
+		node.opcServer;
 		
 		init();
 		
 		setInterval(function(){
 			if(node.isConnected && !busy){
-				opcServer.getStatus().catch(function(e){
+				node.opcServer.getStatus().catch(function(e){
 					node.reconnect();
 				});
 			}
@@ -88,7 +90,6 @@ module.exports = function(RED) {
 		async function init(){
 			try{
 				busy = true;
-				await updateStatus('connecting');
 				var timeout = parseInt(config.timeout);
 			
 				comSession = new Session();
@@ -107,11 +108,12 @@ module.exports = function(RED) {
 				await comServer.init();
 				
 				var comObject = await comServer.createInstance();
-				opcServer = new OPCServer();		
+				var opcServer = new OPCServer();		
 				await opcServer.init(comObject);
 				
-				node.isConnected = true;								
-				await createGroups();
+				node.opcServer = opcServer;
+				node.isConnected = true;
+				serverStatusChanged(true);
 			}
 			catch(e){
 				onError(e);
@@ -124,9 +126,9 @@ module.exports = function(RED) {
 		async function destroy(){
 			busy = true;
 			try{
-				if(opcServer){
-					await opcServer.end();
-					opcServer.opcServer = null;
+				if(node.opcServer){
+					await node.opcServer.end();
+					node.opcServer.opcServer = null;
 				}
 				
 				if(comServer){
@@ -137,37 +139,31 @@ module.exports = function(RED) {
 					await comSession.destroySession();
 					comSession = null;
 				}
-
-				updateStatus('disconnected');
 			}
 			catch(e){
 				onError(e);
 			}
 			finally{
 				node.isConnected = false;
+				serverStatusChanged(false);
 				busy = false;
 			}
 		}
 		
-		async function createGroups(){
+		async function serverStatusChanged(isConnected){
 			for(entry of groupNodes.entries()){
-				var groupNode = entry[1];
-
-				var opts = {
-					updateRate: parseInt(groupNode.config.updaterate)
-				};
-				
-				var opcGroup = await opcServer.addGroup(groupNode.config.id, opts);
-				
-				await groupNode.init(opcGroup);
+				entry[1].serverStatusChanged(isConnected);
 			}
+		}
+		
+		node.registerGroupNode = function registerGroupNode(groupNode){
+			groupNodes.set(groupNode.config.id, groupNode);
 		}
 		
 		//reconnect server
 		let reconnecting = false;
 		node.reconnect = async function reconnect(){
 			reconnecting = true;
-			updateStatus("disconnected");
 			await new Promise(resolve => setTimeout(resolve, 1000));
 			if(reconnecting){
 				node.warn("Reconnecting...");
@@ -177,15 +173,22 @@ module.exports = function(RED) {
 			}
 		}
 		
-		function updateStatus(status){
-			node.emit('__server_status__', status);	
-		}
-		
-		function onError(e){
-			updateStatus('servererror');
+		async function onError(e){
 			node.isConnected = false;
+			serverStatusChanged(false);
+			node.reconnect();
 			var msg = errorMessage(e);
 			node.error(msg);
+
+			switch(e) {
+				case 0x00000005:
+                case 0xC0040010:
+                case 0x80040154:
+                case 0x00000061:
+					return;
+                default:
+                    await node.reconnect().catch(onError);
+            }
 		}
 					
 		function errorMessage(e){
@@ -193,12 +196,8 @@ module.exports = function(RED) {
 			return msg;
 		}
 		
-		node.addGroupNode = async function registerGroup(object){
-			groupNodes.set(object.config.id, object);
-		}
-		
 		node.on('close', function(){
-			destroy();
+			node.destroy();
 			done();
 		});
 	}

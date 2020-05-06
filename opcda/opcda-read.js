@@ -26,8 +26,7 @@ module.exports = function(RED) {
 	function OPCDARead(config) {
         RED.nodes.createNode(this,config);
         let node = this;
-		let groupStatus = "";
-		
+				
 		node.config = config;
 		
 		let serverNode = RED.nodes.getNode(config.server);
@@ -41,15 +40,18 @@ module.exports = function(RED) {
 			return;
 		}
 		
-		serverNode.addGroupNode(this);
+		serverNode.registerGroupNode(node);		
 		
 		if(serverNode.isConnected){
-			serverNode.reconnect();
+			var opts = {
+				updateRate: parseInt(config.updaterate)
+			};
+			
+			serverNode.opcServer.addGroup(config.id, opts).then(function(group){
+				node.init(group);
+			});
 		}
 		
-		serverNode.addListener("__server_status__", function(status) {
-			updateStatus(status);
-		});
 		
 		node.init = async function init(createdGroup){	
 			try{
@@ -145,7 +147,7 @@ module.exports = function(RED) {
 						else if(valueSets[i].quality >= 64 && valueSets[i].quality < 192){
 							quality = "UNCERTAIN";
 						}
-						else if(valueSets[i].quality >= 19 && valueSets[i].quality <= 219){
+						else if(valueSets[i].quality >= 192 && valueSets[i].quality <= 219){
 							quality = "GOOD";
 						}
 						else{
@@ -175,7 +177,7 @@ module.exports = function(RED) {
 						node.send(msg);		
 					}
 					
-					if(config.groupitems.length == valuesTmp.length){
+					if(config.groupitems.length == valueSets.length){
 						updateStatus('ready');
 					}
 					else{
@@ -192,7 +194,23 @@ module.exports = function(RED) {
 				reading = false;
 			}
 		}
+		
 	
+		node.serverStatusChanged = async function serverStatusChanged(isConnected){
+			
+			if(isConnected){
+				var opts = {
+					updateRate: parseInt(config.updaterate)
+				};
+				
+				var createdGroup = await serverNode.opcServer.addGroup(config.id, opts);
+				node.init(createdGroup);
+			}
+			else{
+				await destroy();
+			}
+		}
+		
 		function updateStatus(status){
 			groupStatus = status;
 			switch(status){
@@ -208,9 +226,6 @@ module.exports = function(RED) {
 				case "reading":
 					node.status({fill:"blue",shape:"ring",text:"Reading Data"});
 					break;
-				case "servererror":
-					node.status({fill:"red",shape:"ring",text:"Server Error"});
-					break;
 				case "grouperror":
 					node.status({fill:"red",shape:"ring",text:"Group Error"});
 					break;
@@ -218,7 +233,7 @@ module.exports = function(RED) {
 					node.status({fill:"red",shape:"ring",text:"Read Error"});
 					break;
 				case "mismatch":
-					node.status({fill:"red",shape:"ring",text:"Mismatch"});
+					node.status({fill:"yellow",shape:"ring",text:"Mismatch"});
 					break;
 				default:
 					node.status({fill:"grey",shape:"ring",text:"Unknown"});
@@ -240,12 +255,16 @@ module.exports = function(RED) {
 			if(serverNode.isConnected && !reading){
 				readGroup(config.cache);
 			}
+			else{
+				updateStatus('readerror');
+			}
         });	
 	
 		node.on('close', function(){
 			destroy();
 			serverNode.removeListener("__server_status__");
 		});
+		
     }
 	
     RED.nodes.registerType("opcda-read",OPCDARead);
