@@ -96,7 +96,11 @@ module.exports = function(RED) {
 		}
 	
 		async function destroy(){
-			try {                
+			try {    
+				if (opcSyncIO) {
+                    await opcSyncIO.end();
+                    opcSyncIO = null;
+                }            
                 if (opcItemMgr) {
                     await opcItemMgr.end();
                     opcItemMgr = null;
@@ -131,7 +135,7 @@ module.exports = function(RED) {
 				updateStatus("ready");
 			}
 			catch(e){
-				updateStatus('writeerror');
+				updateStatus('error');
 				
 				var msg = { payload: false };
 				node.send(msg);	
@@ -170,8 +174,8 @@ module.exports = function(RED) {
 				case "ready":
 					node.status({fill:"green",shape:"ring",text:"Ready"});
 					break;
-				case "reading":
-					node.status({fill:"blue",shape:"ring",text:"Reading"});
+				case "writing":
+					node.status({fill:"blue",shape:"ring",text:"Writing"});
 					break;
 				case "error":
 					node.status({fill:"red",shape:"ring",text:"Error"});

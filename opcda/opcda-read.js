@@ -257,6 +257,7 @@ module.exports = function(RED) {
 		node.on('close', function(){
 			destroy();
 			serverNode.removeListener("__server_status__");
+			done();
 		});
 		
     }
