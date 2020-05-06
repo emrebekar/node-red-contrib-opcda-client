@@ -58,7 +58,7 @@ module.exports = function(RED) {
 				serverHandles = [];
 				clientHandles = [];
 				reading = false;
-
+				
 				opcItemMgr = await createdGroup.getItemManager();
 				opcSyncIO = await createdGroup.getSyncIO();
 				
@@ -187,7 +187,7 @@ module.exports = function(RED) {
 				});
 			}
 			catch(e){
-				serverStatusChanged('error');
+				updateStatus('error');
                 onError(e);
 			}
 			finally{
