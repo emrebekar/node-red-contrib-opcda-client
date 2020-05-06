@@ -35,7 +35,7 @@ module.exports = function(RED) {
 		let reading = false;
 		
 		if(!serverNode){
-			updateStatus("grouperror");
+			updateStatus("error");
 			node.error("Please select a server.")
 			return;
 		}
@@ -48,12 +48,12 @@ module.exports = function(RED) {
 			};
 			
 			serverNode.opcServer.addGroup(config.id, opts).then(function(group){
-				node.init(group);
+				init(group);
 			});
 		}
 		
 		
-		node.init = async function init(createdGroup){	
+		async function init(createdGroup){	
 			try{
 				serverHandles = [];
 				clientHandles = [];
@@ -85,7 +85,7 @@ module.exports = function(RED) {
 				updateStatus('ready');
 			}
 			catch(e){
-				updateStatus('grouperror');
+				updateStatus('error');
                 onError(e);
 				serverNode.reconnect();
 			}
@@ -109,7 +109,7 @@ module.exports = function(RED) {
                 }
             } 
 			catch (e) {
-				updateStatus('grouperror');
+				updateStatus('error');
                 onError(e);
             }
 		}
@@ -187,7 +187,7 @@ module.exports = function(RED) {
 				});
 			}
 			catch(e){
-				updateStatus('readerror');
+				serverStatusChanged('error');
                 onError(e);
 			}
 			finally{
@@ -196,15 +196,15 @@ module.exports = function(RED) {
 		}
 		
 	
-		node.serverStatusChanged = async function serverStatusChanged(isConnected){
-			
-			if(isConnected){
+		node.serverStatusChanged = async function serverStatusChanged(status){
+			updateStatus(status);
+			if(serverNode.isConnected){
 				var opts = {
 					updateRate: parseInt(config.updaterate)
 				};
 				
 				var createdGroup = await serverNode.opcServer.addGroup(config.id, opts);
-				node.init(createdGroup);
+				init(createdGroup);
 			}
 			else{
 				await destroy();
@@ -224,13 +224,10 @@ module.exports = function(RED) {
 					node.status({fill:"green",shape:"ring",text:"Ready"});
 					break;
 				case "reading":
-					node.status({fill:"blue",shape:"ring",text:"Reading Data"});
+					node.status({fill:"blue",shape:"ring",text:"Reading"});
 					break;
-				case "grouperror":
-					node.status({fill:"red",shape:"ring",text:"Group Error"});
-					break;
-				case "readerror":
-					node.status({fill:"red",shape:"ring",text:"Read Error"});
+				case "error":
+					node.status({fill:"red",shape:"ring",text:"Error"});
 					break;
 				case "mismatch":
 					node.status({fill:"yellow",shape:"ring",text:"Mismatch"});
@@ -254,9 +251,6 @@ module.exports = function(RED) {
 		node.on('input', function(msg){
 			if(serverNode.isConnected && !reading){
 				readGroup(config.cache);
-			}
-			else{
-				updateStatus('readerror');
 			}
         });	
 	

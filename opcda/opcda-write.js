@@ -51,22 +51,24 @@ module.exports = function(RED) {
 		let writing = false;
 		
 		if(!serverNode){
-			updateStatus("grouperror");
+			updateStatus("error");
 			node.error("Please select a server.")
 			return;
 		}
-				
-		serverNode.addGroupNode(this);
+		
+		serverNode.registerGroupNode(node);	
 		
 		if(serverNode.isConnected){
-			serverNode.reconnect();
+			var opts = {
+				updateRate: parseInt(config.updaterate)
+			};
+			
+			serverNode.opcServer.addGroup(config.id, opts).then(function(group){
+				init(group);
+			});
 		}
 		
-		serverNode.addListener("__server_status__", function(status) {
-			updateStatus(status);
-		});
-		
-		node.init = async function init(createdGroup){	
+		async function init(createdGroup){	
 			try{
 				reading = false;
 
@@ -87,7 +89,7 @@ module.exports = function(RED) {
 				updateStatus('ready');
 			}
 			catch(e){
-				updateStatus('grouperror');
+				updateStatus("error");
                 onError(e);
 				serverNode.reconnect();
 			}
@@ -106,7 +108,7 @@ module.exports = function(RED) {
                 }
             } 
 			catch (e) {
-				updateStatus('grouperror');
+				updateStatus('error');
                 onError(e);
             }
 		}
@@ -140,6 +142,21 @@ module.exports = function(RED) {
 				writing = false;
 			}
 		}
+		
+		node.serverStatusChanged = async function serverStatusChanged(status){
+			updateStatus(status);
+			if(serverNode.isConnected){
+				var opts = {
+					updateRate: parseInt(config.updaterate)
+				};
+				
+				var createdGroup = await serverNode.opcServer.addGroup(config.id, opts);
+				init(createdGroup);
+			}
+			else{
+				await destroy();
+			}
+		}
 
 		function updateStatus(status){
 			groupStatus = status;
@@ -153,17 +170,14 @@ module.exports = function(RED) {
 				case "ready":
 					node.status({fill:"green",shape:"ring",text:"Ready"});
 					break;
-				case "writing":
-					node.status({fill:"blue",shape:"ring",text:"Writing Data"});
+				case "reading":
+					node.status({fill:"blue",shape:"ring",text:"Reading"});
 					break;
-				case "servererror":
-					node.status({fill:"red",shape:"ring",text:"Server Error"});
+				case "error":
+					node.status({fill:"red",shape:"ring",text:"Error"});
 					break;
-				case "grouperror":
-					node.status({fill:"red",shape:"ring",text:"Group Error"});
-					break;
-				case "writeerror":
-					node.status({fill:"red",shape:"ring",text:"Write Error"});
+				case "mismatch":
+					node.status({fill:"yellow",shape:"ring",text:"Mismatch"});
 					break;
 				default:
 					node.status({fill:"grey",shape:"ring",text:"Unknown"});
@@ -174,7 +188,6 @@ module.exports = function(RED) {
 		function onError(e){
 			var msg = errorMessage(e);
 			node.error(msg);
-			console.log(e);
 		}
 		
 		function errorMessage(e){

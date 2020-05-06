@@ -72,23 +72,28 @@ module.exports = function(RED) {
 		let busy = false;
 		let comSession, comServer;
 		let groupNodes = new Map();
-		
+				
 		node.isConnected = false;
-		serverStatusChanged(false);
+		serverStatusChanged('disconnected');
 		node.opcServer;
 		
 		init();
-		
+	
 		setInterval(function(){
 			if(node.isConnected && !busy){
 				node.opcServer.getStatus().catch(function(e){
 					node.reconnect();
 				});
 			}
-		}, 1000);
+			else if(!node.isConnected && busy){
+				node.reconnect();
+			}
+		}, parseInt(config.timeout));
 		
 		async function init(){
 			try{
+				serverStatusChanged('connecting');
+				
 				busy = true;
 				var timeout = parseInt(config.timeout);
 			
@@ -98,13 +103,6 @@ module.exports = function(RED) {
 								
 				comServer = new ComServer(new Clsid(config.clsid), config.address, comSession);	
 				
-				//init timeout
-				setTimeout(function(){
-					if(!node.isConnected){
-						node.reconnect();
-					}
-				}, timeout);
-				
 				await comServer.init();
 				
 				var comObject = await comServer.createInstance();
@@ -113,7 +111,7 @@ module.exports = function(RED) {
 				
 				node.opcServer = opcServer;
 				node.isConnected = true;
-				serverStatusChanged(true);
+				serverStatusChanged('connected');
 			}
 			catch(e){
 				onError(e);
@@ -128,10 +126,11 @@ module.exports = function(RED) {
 			try{
 				if(node.opcServer){
 					await node.opcServer.end();
-					node.opcServer.opcServer = null;
+					node.opcServer = null;
 				}
 				
 				if(comServer){
+					await comServer.closeStub()
 					comServer = null;
 				}
 				
@@ -145,14 +144,14 @@ module.exports = function(RED) {
 			}
 			finally{
 				node.isConnected = false;
-				serverStatusChanged(false);
+				serverStatusChanged('disconnected');
 				busy = false;
 			}
 		}
 		
-		async function serverStatusChanged(isConnected){
+		async function serverStatusChanged(status){
 			for(entry of groupNodes.entries()){
-				entry[1].serverStatusChanged(isConnected);
+				entry[1].serverStatusChanged(status);
 			}
 		}
 		
@@ -166,7 +165,7 @@ module.exports = function(RED) {
 			reconnecting = true;
 			await new Promise(resolve => setTimeout(resolve, 1000));
 			if(reconnecting){
-				node.warn("Reconnecting...");
+				//node.warn("Reconnecting...");
 				await destroy();
 				await init();
 				reconnecting = false;
@@ -174,11 +173,9 @@ module.exports = function(RED) {
 		}
 		
 		async function onError(e){
-			node.isConnected = false;
-			serverStatusChanged(false);
-			node.reconnect();
 			var msg = errorMessage(e);
 			node.error(msg);
+			serverStatusChanged('error');
 
 			switch(e) {
 				case 0x00000005:
@@ -197,7 +194,7 @@ module.exports = function(RED) {
 		}
 		
 		node.on('close', function(){
-			node.destroy();
+			destroy();
 			done();
 		});
 	}
