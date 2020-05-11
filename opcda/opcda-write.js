@@ -60,15 +60,17 @@ module.exports = function(RED) {
 			return;
 		}
 		
-		serverNode.registerGroupNode(node);	
-		serverNode.reconnect();
+		serverNode.registerGroupNode(node);
+		serverNode.reconnect();		
 
-		node.init = async function init(createdGroup){	
+		async function init(){	
 			try{
+				serverNode.busy = true;
 				reading = false;
-
-				opcItemMgr = await createdGroup.getItemManager();
-				opcSyncIO = await createdGroup.getSyncIO();
+				
+				opcGroup = await serverNode.opcServer.addGroup(config.id, null);	
+				opcItemMgr = await opcGroup.getItemManager();
+				opcSyncIO = await opcGroup.getSyncIO();
 				
 				updateStatus('ready');
 			}
@@ -77,10 +79,14 @@ module.exports = function(RED) {
                 onError(e);
 				serverNode.reconnect();
 			}
+			finally{
+				serverNode.busy = false;
+			}
 		}
 	
 		async function destroy(){
-			try {    
+			try {
+				serverNode.busy = true;
 				if (opcSyncIO) {
                     await opcSyncIO.end();
                     opcSyncIO = null;
@@ -99,6 +105,9 @@ module.exports = function(RED) {
 				updateStatus('error');
                 onError(e);
             }
+			finally{
+				serverNode.busy = false;
+			}
 		}
 		
 		async function writeGroup(itemValues){
@@ -159,6 +168,9 @@ module.exports = function(RED) {
 		
 		node.serverStatusChanged = async function serverStatusChanged(status){
 			updateStatus(status);
+			if(status == 'connected'){
+				await init();
+			}
 		}
 
 		function updateStatus(status){
@@ -200,7 +212,7 @@ module.exports = function(RED) {
 		}
 		
 		node.on('input', function(msg){
-			if(serverNode.isConnected && !writing){
+			if(serverNode.isConnected && !writing && opcSyncIO){
 				writeGroup(msg.payload);	
 			}
         });	

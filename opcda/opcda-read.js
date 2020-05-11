@@ -42,15 +42,16 @@ module.exports = function(RED) {
 		
 		serverNode.registerGroupNode(node);	
 		serverNode.reconnect();
-		
-		node.init = async function init(createdGroup){	
+
+		async function init(){	
 			try{
 				serverHandles = [];
 				clientHandles = [];
 				reading = false;
 				
-				opcItemMgr = await createdGroup.getItemManager();
-				opcSyncIO = await createdGroup.getSyncIO();
+				opcGroup = await serverNode.opcServer.addGroup(config.id, null);				
+				opcItemMgr = await opcGroup.getItemManager();
+				opcSyncIO = await opcGroup.getSyncIO();
 				
 				let clientHandle = 1;
 				var itemsList = config.groupitems.map(e => {
@@ -77,7 +78,7 @@ module.exports = function(RED) {
 			catch(e){
 				updateStatus('error');
                 onError(e);
-				serverNode.reconnect();
+				await serverNode.reconnect();
 			}
 		}
 	
@@ -107,6 +108,7 @@ module.exports = function(RED) {
 		let oldValues = [];
 		async function readGroup(cache){
 			try{
+				
 				reading = true;
 				var dataSource = cache ? opcda.constants.opc.dataSource.CACHE : opcda.constants.opc.dataSource.DEVICE;
 
@@ -169,11 +171,8 @@ module.exports = function(RED) {
 						node.send(msg);		
 					}
 					
-					if(config.groupitems.length == valueSets.length && config.groupitems.length > 1){
+					if(config.groupitems.length == datas.length){
 						updateStatus('ready');
-					}
-					else if(quality != "GOOD" && quality != "UNKNOWN"){
-						updateStatus('badquality');
 					}
 					else if(config.groupitems.length < 1){
 						updateStatus('noitem');
@@ -194,6 +193,9 @@ module.exports = function(RED) {
 	
 		node.serverStatusChanged = async function serverStatusChanged(status){
 			updateStatus(status);
+			if(status == 'connected'){
+				await init();
+			}
 		}
 		
 		function updateStatus(status){
@@ -231,7 +233,6 @@ module.exports = function(RED) {
 		
 		function onError(e){
 			var msg = errorMessage(e);
-			//console.log(e);
 			node.error(msg);
 		}
 		
@@ -241,14 +242,15 @@ module.exports = function(RED) {
 		}
 		
 		node.on('input', function(msg){
-			if(serverNode.isConnected && !reading){
+			if(serverNode.isConnected && !reading && opcSyncIO){
 				readGroup(config.cache);
 			}
         });	
 	
 		node.on('close', function(){
+			console.log("close");
 			destroy();
-			serverNode.removeListener("__server_status__");
+			serverNode.removeGroupNode(config.id);
 			done();
 		});
 		

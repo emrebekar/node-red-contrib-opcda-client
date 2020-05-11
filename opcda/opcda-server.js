@@ -69,18 +69,19 @@ module.exports = function(RED) {
             return node.error("Failed to load credentials!");
         }	
 
-		let busy = false;
-		let comSession, comServer, opcServer;
+		node.busy = false;
+		let comSession, comServer;
 		let groupNodes = new Map();
-				
+						
 		node.isConnected = false;
-		serverStatusChanged('disconnected');
+		
+		//init();
 				
 		async function init(){
 			try{
-				serverStatusChanged('connecting');
+				await serverStatusChanged('connecting');
 				
-				busy = true;
+				node.busy = true;
 				var timeout = parseInt(config.timeout);
 			
 				comSession = new Session();
@@ -97,32 +98,26 @@ module.exports = function(RED) {
 				await comServer.init();
 				
 				var comObject = await comServer.createInstance();
-				opcServer = new OPCServer();		
-				await opcServer.init(comObject);
-				
+				node.opcServer = new OPCServer();		
+				await node.opcServer.init(comObject);
+						
 				node.isConnected = true;
-				serverStatusChanged('connected');
-				
-				for(entry of groupNodes.entries()){
-					groupNode = entry[1];
-					var opcGroup = await opcServer.addGroup(groupNode.config.id, null);
-					await groupNode.init(opcGroup);
-				}
+				await serverStatusChanged('connected');
 			}
 			catch(e){
 				onError(e);
 			}
 			finally{
-				busy = false;
+				node.busy = false;
 			}
 		}
 				
 		async function destroy(){
-			busy = true;
+			node.busy = true;
 			try{
-				if(opcServer){
-					await opcServer.end();
-					opcServer = null;
+				if(node.opcServer){
+					await node.opcServer.end();
+					node.opcServer = null;
 				}
 				
 				if(comServer){
@@ -140,19 +135,23 @@ module.exports = function(RED) {
 			}
 			finally{
 				node.isConnected = false;
-				serverStatusChanged('disconnected');
-				busy = false;
+				await serverStatusChanged('disconnected');
+				node.busy = false;
 			}
 		}
 		
 		async function serverStatusChanged(status){
 			for(entry of groupNodes.entries()){
-				entry[1].serverStatusChanged(status);
+				await entry[1].serverStatusChanged(status);
 			}
 		}
 		
 		node.registerGroupNode = function registerGroupNode(groupNode){
 			groupNodes.set(groupNode.config.id, groupNode);
+		}
+		
+		node.removeGroupNode = function removeGroupNode(groupNode){
+			groupNodes.delete(groupNode.config.id);
 		}
 		
 		//reconnect server
@@ -170,7 +169,7 @@ module.exports = function(RED) {
 		async function onError(e){
 			var msg = errorMessage(e);
 			node.error(msg);
-			serverStatusChanged('error');
+			await serverStatusChanged('error');
 
 			switch(e) {
 				case 0x00000005:
