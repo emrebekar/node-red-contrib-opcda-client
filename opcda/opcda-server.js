@@ -70,26 +70,12 @@ module.exports = function(RED) {
         }	
 
 		let busy = false;
-		let comSession, comServer;
+		let comSession, comServer, opcServer;
 		let groupNodes = new Map();
 				
 		node.isConnected = false;
 		serverStatusChanged('disconnected');
-		node.opcServer;
-		
-		init();
-	
-		setInterval(function(){
-			if(node.isConnected && !busy){
-				node.opcServer.getStatus().catch(function(e){
-					node.reconnect();
-				});
-			}
-			else if(!node.isConnected && busy){
-				node.reconnect();
-			}
-		}, parseInt(config.timeout));
-		
+				
 		async function init(){
 			try{
 				serverStatusChanged('connecting');
@@ -103,15 +89,25 @@ module.exports = function(RED) {
 								
 				comServer = new ComServer(new Clsid(config.clsid), config.address, comSession);	
 				
+				comServer.on('disconnected',function(){
+					serverStatusChanged('disconnected');
+					node.reconnect();
+				});
+				
 				await comServer.init();
 				
 				var comObject = await comServer.createInstance();
-				var opcServer = new OPCServer();		
+				opcServer = new OPCServer();		
 				await opcServer.init(comObject);
 				
-				node.opcServer = opcServer;
 				node.isConnected = true;
 				serverStatusChanged('connected');
+				
+				for(entry of groupNodes.entries()){
+					groupNode = entry[1];
+					var opcGroup = await opcServer.addGroup(groupNode.config.id, null);
+					await groupNode.init(opcGroup);
+				}
 			}
 			catch(e){
 				onError(e);
@@ -124,9 +120,9 @@ module.exports = function(RED) {
 		async function destroy(){
 			busy = true;
 			try{
-				if(node.opcServer){
-					await node.opcServer.end();
-					node.opcServer = null;
+				if(opcServer){
+					await opcServer.end();
+					opcServer = null;
 				}
 				
 				if(comServer){
@@ -162,10 +158,9 @@ module.exports = function(RED) {
 		//reconnect server
 		let reconnecting = false;
 		node.reconnect = async function reconnect(){
-			reconnecting = true;
-			await new Promise(resolve => setTimeout(resolve, 1000));
-			if(reconnecting){
-				//node.warn("Reconnecting...");
+			if(!reconnecting){
+				reconnecting = true;
+				await new Promise(resolve => setTimeout(resolve, 1000));
 				await destroy();
 				await init();
 				reconnecting = false;

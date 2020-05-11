@@ -1,5 +1,6 @@
 module.exports = function(RED) {
 	const opcda = require('node-opc-da');
+	const {ComString} = opcda.dcom;
 	
 	const errorCode = {
 		0x80040154 : "Clsid is not found.",
@@ -32,7 +33,7 @@ module.exports = function(RED) {
 		"long" : opcda.dcom.Types.LONG,
 		"boolean" : opcda.dcom.Types.BOOLEAN,
 		"uuid" : opcda.dcom.Types.UUID,
-		"string" : opcda.dcom.Types.STRING,
+		"string" : opcda.dcom.Types.COMSTRING,
 		"char" : opcda.dcom.Types.CHARACTER,
 		"date" : opcda.dcom.Types.DATE,
 		"currency" : opcda.dcom.Types.CURRENCY,
@@ -57,18 +58,9 @@ module.exports = function(RED) {
 		}
 		
 		serverNode.registerGroupNode(node);	
-		
-		if(serverNode.isConnected){
-			var opts = {
-				updateRate: parseInt(config.updaterate)
-			};
-			
-			serverNode.opcServer.addGroup(config.id, opts).then(function(group){
-				init(group);
-			});
-		}
-		
-		async function init(createdGroup){	
+		serverNode.reconnect();
+
+		node.init = async function init(createdGroup){	
 			try{
 				reading = false;
 
@@ -120,12 +112,33 @@ module.exports = function(RED) {
 		async function writeGroup(value){
 			try{
 				writing = true;
+				valueType = typeof value;
+				
 				updateStatus("writing");
+				
 				var object = [{
-					value: value,
+					value: valueType == 'string' ? new ComString(value, null) : value,
 					handle: serverHandle,
-					type: itemTypes[config.itemtype]
+					type: itemTypes[valueType]
 				}];
+				
+				var item = [
+					{itemID: "bla", value: 1},
+					{itemID: "bla", value: 1}
+				];
+				
+				var dict[itemID] = serverHanlde;
+				
+				for(i of item){
+					
+					
+					var object = [{
+					value: i.value == 'string' ? new ComString(value, null) : value,
+					handle: dict[i.itemID],
+					type: itemTypes[valueType]
+				}];
+				}
+				
 								
 				await opcSyncIO.write(object);
 				
@@ -149,17 +162,6 @@ module.exports = function(RED) {
 		
 		node.serverStatusChanged = async function serverStatusChanged(status){
 			updateStatus(status);
-			if(serverNode.isConnected){
-				var opts = {
-					updateRate: parseInt(config.updaterate)
-				};
-				
-				var createdGroup = await serverNode.opcServer.addGroup(config.id, opts);
-				init(createdGroup);
-			}
-			else{
-				await destroy();
-			}
 		}
 
 		function updateStatus(status){
@@ -191,6 +193,7 @@ module.exports = function(RED) {
 		
 		function onError(e){
 			var msg = errorMessage(e);
+			console.log(e);
 			node.error(msg);
 		}
 		

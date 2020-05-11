@@ -40,20 +40,10 @@ module.exports = function(RED) {
 			return;
 		}
 		
-		serverNode.registerGroupNode(node);		
+		serverNode.registerGroupNode(node);	
+		serverNode.reconnect();
 		
-		if(serverNode.isConnected){
-			var opts = {
-				updateRate: parseInt(config.updaterate)
-			};
-			
-			serverNode.opcServer.addGroup(config.id, opts).then(function(group){
-				init(group);
-			});
-		}
-		
-		
-		async function init(createdGroup){	
+		node.init = async function init(createdGroup){	
 			try{
 				serverHandles = [];
 				clientHandles = [];
@@ -177,13 +167,18 @@ module.exports = function(RED) {
 						node.send(msg);		
 					}
 					
-					if(config.groupitems.length == valueSets.length){
+					if(config.groupitems.length == valueSets.length && config.groupitems.length > 1){
 						updateStatus('ready');
+					}
+					else if(quality != "GOOD" && quality != "UNKNOWN"){
+						updateStatus('badquality');
+					}
+					else if(config.groupitems.length < 1){
+						updateStatus('noitem');
 					}
 					else{
 						updateStatus('mismatch');
 					}
-
 				});
 			}
 			catch(e){
@@ -194,21 +189,9 @@ module.exports = function(RED) {
 				reading = false;
 			}
 		}
-		
 	
 		node.serverStatusChanged = async function serverStatusChanged(status){
 			updateStatus(status);
-			if(serverNode.isConnected){
-				var opts = {
-					updateRate: parseInt(config.updaterate)
-				};
-				
-				var createdGroup = await serverNode.opcServer.addGroup(config.id, opts);
-				init(createdGroup);
-			}
-			else{
-				await destroy();
-			}
 		}
 		
 		function updateStatus(status){
@@ -220,6 +203,12 @@ module.exports = function(RED) {
 				case "connecting":
 					node.status({fill:"yellow",shape:"ring",text:"Connecting"});
 					break;
+				case "noitem":
+					node.status({fill:"blue",shape:"ring",text:"No Item Added"});
+					break;
+				case "badquality":
+					node.status({fill:"red",shape:"ring",text:"Bad Quality"});
+					break;
 				case "ready":
 					node.status({fill:"green",shape:"ring",text:"Ready"});
 					break;
@@ -230,7 +219,7 @@ module.exports = function(RED) {
 					node.status({fill:"red",shape:"ring",text:"Error"});
 					break;
 				case "mismatch":
-					node.status({fill:"yellow",shape:"ring",text:"Mismatch"});
+					node.status({fill:"yellow",shape:"ring",text:"Mismatch Data"});
 					break;
 				default:
 					node.status({fill:"grey",shape:"ring",text:"Unknown"});
