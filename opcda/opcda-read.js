@@ -22,11 +22,11 @@ module.exports = function(RED) {
 		0x0004000D : "The server does not support the requested data rate but will use the closest available rate.",
 		0x00000061 : "Clsid syntax is invalid"
 	};
-    
+	    
 	function OPCDARead(config) {
         RED.nodes.createNode(this,config);
         let node = this;
-				
+						
 		node.config = config;
 		
 		let serverNode = RED.nodes.getNode(config.server);
@@ -112,6 +112,7 @@ module.exports = function(RED) {
 
 				let valuesTmp = [];
 				await opcSyncIO.read(dataSource, serverHandles).then(function(valueSets){
+					
 					var datas = [];
 					
 					let changed = false;
@@ -149,7 +150,8 @@ module.exports = function(RED) {
 							errorCode: valueSets[i].errorCode,
 							quality: quality,
 							timestamp: valueSets[i].timestamp,
-							value: valueSets[i].value
+							value: valueSets[i].value,
+							//type: opcda.dcom.Types.descr[valueSets[i].type.toString()]
 						}
 						
 						datas.push(data);
@@ -229,6 +231,7 @@ module.exports = function(RED) {
 		
 		function onError(e){
 			var msg = errorMessage(e);
+			//console.log(e);
 			node.error(msg);
 		}
 		

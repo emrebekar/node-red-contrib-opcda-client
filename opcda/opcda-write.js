@@ -47,7 +47,10 @@ module.exports = function(RED) {
 		node.config = config;
 		
 		let serverNode = RED.nodes.getNode(config.server);
-		let opcItemMgr, opcSyncIO, opcGroup, serverHandle;
+		let opcItemMgr, opcSyncIO, opcGroup;
+		let clientHandle = 0;
+		let serverHandles = [];
+		let items = [];
 		
 		let writing = false;
 		
@@ -67,17 +70,6 @@ module.exports = function(RED) {
 				opcItemMgr = await createdGroup.getItemManager();
 				opcSyncIO = await createdGroup.getSyncIO();
 				
-				var item = [{itemID: config.itemid, clientHandle: 1}];
-				var addedItems = await opcItemMgr.add(item);
-				var addedItem = addedItems[0];
-				
-				if (addedItem[0] !== 0) {
-					node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
-				} 
-				else {
-					serverHandle = addedItem[1].serverHandle;
-				}
-						
 				updateStatus('ready');
 			}
 			catch(e){
@@ -109,38 +101,43 @@ module.exports = function(RED) {
             }
 		}
 		
-		async function writeGroup(value){
+		async function writeGroup(itemValues){
+			
 			try{
 				writing = true;
-				valueType = typeof value;
-				
 				updateStatus("writing");
 				
-				var object = [{
-					value: valueType == 'string' ? new ComString(value, null) : value,
-					handle: serverHandle,
-					type: itemTypes[valueType]
-				}];
-				
-				var item = [
-					{itemID: "bla", value: 1},
-					{itemID: "bla", value: 1}
-				];
-				
-				var dict[itemID] = serverHanlde;
-				
-				for(i of item){
-					
-					
-					var object = [{
-					value: i.value == 'string' ? new ComString(value, null) : value,
-					handle: dict[i.itemID],
-					type: itemTypes[valueType]
-				}];
+				if(itemValues.length != items.length){
+					for(itemValue of itemValues){
+						if(!items.includes(itemValue.itemID)){
+							clientHandle++;
+
+							var item = [{itemID: itemValue.itemID, clientHandle: clientHandle}];
+							var addedItems = await opcItemMgr.add(item);
+							var addedItem = addedItems[0];
+							
+							if (addedItem[0] !== 0) {
+								node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
+							} 
+							else {
+								serverHandles[itemValue.itemID] = addedItem[1].serverHandle;
+							}
+						}
+					}
 				}
 				
+				var objects = [];
+				for(itemValue of itemValues){	
+					var object = {
+						value: itemValue.type == 'string' ? new ComString(itemValue.value, null) : itemValue.value,
+						handle: serverHandles[itemValue.itemID],
+						type: itemTypes[itemValue.type]
+					};
+					
+					objects.push(object);
+				}
 								
-				await opcSyncIO.write(object);
+				await opcSyncIO.write(objects);
 				
 				var msg = { payload: true };
 				node.send(msg);	
