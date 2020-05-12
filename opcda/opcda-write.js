@@ -122,14 +122,13 @@ module.exports = function(RED) {
 							clientHandle++;
 
 							var item = [{itemID: itemValue.itemID, clientHandle: clientHandle}];
-							var addedItems = await opcItemMgr.add(item);
-							var addedItem = addedItems[0];
+							var addedItem = await opcItemMgr.add(item);
 							
-							if (addedItem[0] !== 0) {
-								node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
+							if ((addedItem[0])[0] !== 0) {
+								node.warn(`Error adding item '${item[0].itemID}': ${errorMessage((addedItem[0])[0])}`);
 							} 
 							else {
-								serverHandles[itemValue.itemID] = addedItem[1].serverHandle;
+								serverHandles[itemValue.itemID] = (addedItem[0])[1].serverHandle;
 							}
 						}
 					}
