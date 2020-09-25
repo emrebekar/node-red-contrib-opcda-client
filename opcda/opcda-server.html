@@ -101,6 +101,7 @@
 				$.get("opcda/browse", queryData)
 				.done(function( data, status, jqXHR ) {
 					alertArea.text(data.items.length + ' items found');
+					itemList.empty();
 					$.each(data.items, function(i, item){
 						$('<li/>').text(item).appendTo(itemList);
 					});

@@ -118,7 +118,7 @@ module.exports = function(RED) {
 					var datas = [];
 					
 					let changed = false;
-					
+
 					for(let i in valueSets){
 						
 						if(config.datachange){
@@ -170,9 +170,17 @@ module.exports = function(RED) {
 						var msg = { payload: datas };
 						node.send(msg);		
 					}
+
+					var isGood = true;
+					for(let i in datas){
+						if(i.quality == 'BAD' || i.quality == 'UNCERTAIN' || i.quality == 'UNKNOWN') {
+							isGood = false;
+							break;
+						}
+					}
 					
 					if(config.groupitems.length == datas.length){
-						updateStatus('ready');
+						updateStatus(isGood ? 'goodquality' : 'badquality');
 					}
 					else if(config.groupitems.length < 1){
 						updateStatus('noitem');
@@ -212,6 +220,9 @@ module.exports = function(RED) {
 					break;
 				case "badquality":
 					node.status({fill:"red",shape:"ring",text:"Bad Quality"});
+					break;
+				case "goodquality":
+					node.status({fill:"blue",shape:"ring",text:"Good Quality"});
 					break;
 				case "ready":
 					node.status({fill:"green",shape:"ring",text:"Ready"});
