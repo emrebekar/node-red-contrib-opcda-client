@@ -25,8 +25,10 @@ module.exports = function(RED) {
 	    
 	function OPCDARead(config) {
         RED.nodes.createNode(this,config);
-        let node = this;
-						
+		let node = this;
+		let badCount = 5;
+		let groupStatus = "unknown";
+		
 		node.config = config;
 		
 		let serverNode = RED.nodes.getNode(config.server);
@@ -43,7 +45,7 @@ module.exports = function(RED) {
 		serverNode.registerGroupNode(node);	
 		serverNode.reconnect();
 
-		async function init(){	
+		async function init(){
 			try{
 				serverHandles = [];
 				clientHandles = [];
@@ -78,7 +80,7 @@ module.exports = function(RED) {
 			catch(e){
 				updateStatus('error');
                 onError(e);
-				await serverNode.reconnect();
+				//await serverNode.reconnect();
 			}
 		}
 	
@@ -118,33 +120,37 @@ module.exports = function(RED) {
 					var datas = [];
 					
 					let changed = false;
+					let isGood = true;
 
 					for(let i in valueSets){
 						
 						if(config.datachange){
-							var oldValue = oldValues[i];
 							if(!changed){
 								if(oldValues.length != valueSets.length || valueSets[i].value != oldValues[i]){
 									changed = true;
 								}
 							}
 							
-							valuesTmp[i] = valueSets[i].value;					
+							valuesTmp[i] = valueSets[i].value;
+							oldValues[i] = valueSets[i].value;			
 						}
 						
 						var quality;
 						
 						if(valueSets[i].quality >= 0 && valueSets[i].quality < 64){
 							quality = "BAD";
+							isGood = false;
 						}
 						else if(valueSets[i].quality >= 64 && valueSets[i].quality < 192){
 							quality = "UNCERTAIN";
+							isGood = false;
 						}
 						else if(valueSets[i].quality >= 192 && valueSets[i].quality <= 219){
 							quality = "GOOD";
 						}
 						else{
 							quality = "UNKNOWN";
+							isGood = false;
 						}
 						
 						var data = {
@@ -153,46 +159,54 @@ module.exports = function(RED) {
 							quality: quality,
 							timestamp: valueSets[i].timestamp,
 							value: valueSets[i].value,
-							//type: opcda.dcom.Types.descr[valueSets[i].type.toString()]
 						}
 						
 						datas.push(data);
 					}
 					
-					if(config.datachange){
-						oldValues = valuesTmp;
-						if(changed){
-							var msg = { payload: datas };
-							node.send(msg);						
-						}		
-					}
-					else{
-						var msg = { payload: datas };
-						node.send(msg);		
-					}
-
-					var isGood = true;
-					for(let i in datas){
-						if(i.quality == 'BAD' || i.quality == 'UNCERTAIN' || i.quality == 'UNKNOWN') {
-							isGood = false;
-							break;
+					if(isGood){
+						if(config.groupitems.length == datas.length){
+							updateStatus('goodquality');
 						}
-					}
-					
-					if(config.groupitems.length == datas.length){
-						updateStatus(isGood ? 'goodquality' : 'badquality');
-					}
-					else if(config.groupitems.length < 1){
-						updateStatus('noitem');
+
+						if(config.groupitems.length != datas.length){
+							updateStatus('mismatch');
+						}
+
+						if(config.groupitems.length < 1){
+							updateStatus('noitem');
+						}
+
+						if(config.datachange){
+							oldValues = valuesTmp;
+							if(changed){
+								var msg = { payload: datas };
+								node.send(msg);						
+							}		
+						}
+
+						else{
+							var msg = { payload: datas };
+							node.send(msg);		
+						}	
 					}
 					else{
-						updateStatus('mismatch');
+						destroy().then(()=>{
+							if(badCount > 0){
+								serverNode.reconnect().then(()=>{
+									badCount--;
+								});
+							}
+							else{
+								updateStatus('badquality');
+							}
+						});
 					}
 				});
 			}
 			catch(e){
 				updateStatus('error');
-                onError(e);
+				onError(e);
 			}
 			finally{
 				reading = false;
@@ -207,39 +221,43 @@ module.exports = function(RED) {
 		}
 		
 		function updateStatus(status){
-			groupStatus = status;
-			switch(status){
-				case "disconnected":
-					node.status({fill:"red",shape:"ring",text:"Disconnected"});
-					break;
-				case "connecting":
-					node.status({fill:"yellow",shape:"ring",text:"Connecting"});
-					break;
-				case "noitem":
-					node.status({fill:"blue",shape:"ring",text:"No Item Added"});
-					break;
-				case "badquality":
-					node.status({fill:"red",shape:"ring",text:"Bad Quality"});
-					break;
-				case "goodquality":
-					node.status({fill:"blue",shape:"ring",text:"Good Quality"});
-					break;
-				case "ready":
-					node.status({fill:"green",shape:"ring",text:"Ready"});
-					break;
-				case "reading":
-					node.status({fill:"blue",shape:"ring",text:"Reading"});
-					break;
-				case "error":
-					node.status({fill:"red",shape:"ring",text:"Error"});
-					break;
-				case "mismatch":
-					node.status({fill:"yellow",shape:"ring",text:"Mismatch Data"});
-					break;
-				default:
-					node.status({fill:"grey",shape:"ring",text:"Unknown"});
-					break;
+						
+			if(groupStatus != status){
+				switch(status){
+					case "disconnected":
+						node.status({fill:"red",shape:"ring",text:"Disconnected"});
+						break;
+					case "connecting":
+						node.status({fill:"yellow",shape:"ring",text:"Connecting"});
+						break;
+					case "noitem":
+						node.status({fill:"yellow",shape:"ring",text:"No Item"});
+						break;
+					case "badquality":
+						node.status({fill:"red",shape:"ring",text:"Bad Quality"});
+						break;
+					case "goodquality":
+						node.status({fill:"blue",shape:"ring",text:"Good Quality"});
+						break;
+					case "ready":
+						node.status({fill:"green",shape:"ring",text:"Ready"});
+						break;
+					case "reading":
+						node.status({fill:"blue",shape:"ring",text:"Reading"});
+						break;
+					case "error":
+						node.status({fill:"red",shape:"ring",text:"Error"});
+						break;
+					case "mismatch":
+						node.status({fill:"yellow",shape:"ring",text:"Mismatch Data"});
+						break;
+					default:
+						node.status({fill:"grey",shape:"ring",text:"Unknown"});
+						break;
+				}
 			}
+
+			groupStatus = status;
 		}
 		
 		function onError(e){
@@ -260,8 +278,9 @@ module.exports = function(RED) {
 	
 		node.on('close', function(){
 			console.log("close");
-			destroy();
-			serverNode.removeGroupNode(config.id);
+			destroy().then(()=>{
+				serverNode.removeGroupNode(config.id);
+			});
 			done();
 		});
 		

@@ -70,7 +70,6 @@ module.exports = function(RED) {
         }	
 
 		node.busy = false;
-		let comSession, comServer;
 		let groupNodes = new Map();
 						
 		node.isConnected = false;
@@ -84,13 +83,14 @@ module.exports = function(RED) {
 				node.busy = true;
 				var timeout = parseInt(config.timeout);
 			
-				comSession = new Session();
+				var comSession = new Session();
 				comSession = comSession.createSession(config.domain, node.credentials.username, node.credentials.password);
 				comSession.setGlobalSocketTimeout(timeout);
 								
-				comServer = new ComServer(new Clsid(config.clsid), config.address, comSession);	
+				var comServer = new ComServer(new Clsid(config.clsid), config.address, comSession);	
 				
 				comServer.on('disconnected',function(){
+					node.busy = false;
 					serverStatusChanged('disconnected');
 					node.reconnect();
 				});
@@ -119,16 +119,6 @@ module.exports = function(RED) {
 					await node.opcServer.end();
 					node.opcServer = null;
 				}
-				
-				if(comServer){
-					await comServer.closeStub()
-					comServer = null;
-				}
-				
-				if(comSession){
-					await comSession.destroySession();
-					comSession = null;
-				}
 			}
 			catch(e){
 				onError(e);
@@ -155,14 +145,12 @@ module.exports = function(RED) {
 		}
 		
 		//reconnect server
-		let reconnecting = false;
 		node.reconnect = async function reconnect(){
-			if(!reconnecting){
+			if(!node.busy){
 				reconnecting = true;
 				await new Promise(resolve => setTimeout(resolve, 1000));
 				await destroy();
 				await init();
-				reconnecting = false;
 			}
 		}
 		
@@ -170,7 +158,7 @@ module.exports = function(RED) {
 			var msg = errorMessage(e);
 			node.error(msg);
 			await serverStatusChanged('error');
-
+			//await node.reconnect().catch(onError);
 			switch(e) {
 				case 0x00000005:
                 case 0xC0040010:
@@ -179,7 +167,7 @@ module.exports = function(RED) {
 					return;
                 default:
                     await node.reconnect().catch(onError);
-            }
+			}
 		}
 					
 		function errorMessage(e){
