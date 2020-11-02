@@ -7,17 +7,18 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "opcda",
+  "opcda",
 	"plc",
 	"industry4.0",
 	"dcom",
 	"opc-da",
-	"automation"
+  "automation",
+  "i4.0"
   ],
   "node-red": {
     "nodes": {
       "opc-read": "opcda/opcda-read.js",
-	  "opc-write": "opcda/opcda-write.js",
+	    "opc-write": "opcda/opcda-write.js",
       "opc-server": "opcda/opcda-server.js"
     }
   },
