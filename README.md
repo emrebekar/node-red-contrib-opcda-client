@@ -66,3 +66,8 @@ set msg.payload parameter with the following;
 - date
 - currency
 - array
+
+#### Screenshots
+![opcda-serverr](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-server.png)
+![opcda-read](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-read.png)
+![opcda-write](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-write.png)
