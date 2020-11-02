@@ -1,4 +1,4 @@
-# node-red-contrib-opcda
+# node-red-contrib-opcda-client
 
 This node can be used in order to read and write to OPC DA servers.
 
@@ -70,10 +70,10 @@ set msg.payload parameter with the following;
 #### Screenshots
 
 ##### opcda-server
-![opcda-server](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_server.png)
+![opcda-server](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda-client/master/images/opcda_server.png)
 
 ##### opcda-read
-![opcda-read](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_read.png)
+![opcda-read](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda-client/master/images/opcda_read.png)
 
 ##### opcda-write
-![opcda-write](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_write.png)
+![opcda-write](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda-client/master/images/opcda_write.png)
