@@ -4,31 +4,9 @@
         <input id="node-input-server" placeholder="Select OPC DA Server">
     </div>
     <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Group Name</label>
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
-	<!--div class="form-row">
-        <label for="node-input-itemid"><i class="fa fa-tag"></i> Item ID</label>
-        <input type="text" id="node-input-itemid" placeholder="Name">
-    </div-->
-	<!--div class="form-row">
-        <label for="node-input-itemtype"><i class="fa fa-tag"></i> Item Type</label>
-        <select type="text" id="node-input-itemtype">
-			<option value="double">DOUBLE</OPTION>
-			<option value="short">SHORT</OPTION>
-			<option value="integer">INTEGER</OPTION>
-			<option value="float">FLOAT</OPTION>
-			<option value="byte">BYTE</OPTION>
-			<option value="long">LONG</OPTION>
-			<option value="boolean">BOOLEAN</OPTION>
-			<option value="uuid">UUID</OPTION>
-			<option value="string">STRING</OPTION>
-			<option value="char">CHAR</OPTION>
-			<option value="date">DATE</OPTION>
-			<option value="currency">CURRENCY</OPTION>
-			<option value="array">ARRAY</OPTION>               
-		</select>
-    </div-->
 </script>
 
 <script type="text/html" data-help-name="opcda-write">
@@ -42,8 +20,6 @@
         defaults: {
 			server: {value: "", type: "opcda-server", required: true},
             name: {value: ""},
-			//itemid: {value: "", required: true},
-			//itemtype: {value: "integer"}
         },
         inputs:1,
         outputs:1,

@@ -158,7 +158,6 @@ module.exports = function(RED) {
 			var msg = errorMessage(e);
 			node.error(msg);
 			await serverStatusChanged('error');
-			//await node.reconnect().catch(onError);
 			switch(e) {
 				case 0x00000005:
                 case 0xC0040010:
