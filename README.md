@@ -68,6 +68,6 @@ set msg.payload parameter with the following;
 - array
 
 #### Screenshots
-![opcda-serverr](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-server.png)
-![opcda-read](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-read.png)
-![opcda-write](https://https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda-write.png)
+![opcda-server](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_server.png)
+![opcda-read](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_read.png)
+![opcda-write](https://raw.githubusercontent.com/emrebekar/node-red-contrib-opcda/master/images/opcda_write.png)
