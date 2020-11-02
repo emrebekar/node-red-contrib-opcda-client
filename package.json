@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-opcda-client",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Node-RED OPC DA Reading and Writing Node",
   "node-red": {
     "nodes": {
@@ -13,6 +13,7 @@
       "plc",
       "industry4.0",
       "dcom",
+      "node-red",
       "opc-da",
       "automation",
       "i4.0"
@@ -24,6 +25,7 @@
     "industry4.0",
     "dcom",
     "opc-da",
+    "node-red",
     "automation",
     "i4.0"
   ],
