@@ -1,28 +1,41 @@
 {
   "name": "node-red-contrib-opcda",
   "version": "0.0.1",
-  "description": "Node-RED Opc DA reading and writing node",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-  "opcda",
-	"plc",
-	"industry4.0",
-	"dcom",
-	"opc-da",
-  "automation",
-  "i4.0"
-  ],
+  "description": "Node-RED Opc DA Reading and Writing Node",
   "node-red": {
     "nodes": {
       "opc-read": "opcda/opcda-read.js",
-	    "opc-write": "opcda/opcda-write.js",
+      "opc-write": "opcda/opcda-write.js",
       "opc-server": "opcda/opcda-server.js"
-    }
+    },
+    "keywords": [
+      "opcda",
+      "plc",
+      "industry4.0",
+      "dcom",
+      "opc-da",
+      "automation",
+      "i4.0"
+    ]
   },
-  "author": "Emre Bekar",
+  "keywords": [
+    "opcda",
+    "plc",
+    "industry4.0",
+    "dcom",
+    "opc-da",
+    "automation",
+    "i4.0"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emrebekar/node-red-contrib-opcda.git"
+  },
+  "author": "emrebekar",
+  "bugs": {
+    "url": "https://github.com/emrebekar/node-red-contrib-opcda/issues"
+  },
+  "homepage": "https://github.com/emrebekar/node-red-contrib-opcda/blob/master/README.md",
   "license": "Apache-2.0",
   "dependencies": {
     "node-opc-da": "^1.0.6"
