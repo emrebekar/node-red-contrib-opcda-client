@@ -94,7 +94,7 @@ module.exports = function(RED) {
 					serverStatusChanged('disconnected');
 					node.reconnect();
 				});
-				
+
 				await comServer.init();
 				
 				var comObject = await comServer.createInstance();
@@ -147,7 +147,6 @@ module.exports = function(RED) {
 		//reconnect server
 		node.reconnect = async function reconnect(){
 			if(!node.busy){
-				reconnecting = true;
 				await new Promise(resolve => setTimeout(resolve, 1000));
 				await destroy();
 				await init();
