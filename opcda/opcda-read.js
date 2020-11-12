@@ -191,16 +191,7 @@ module.exports = function(RED) {
 						}	
 					}
 					else{
-						destroy().then(()=>{
-							if(badCount > 0){
-								serverNode.reconnect().then(()=>{
-									badCount--;
-								});
-							}
-							else{
-								updateStatus('badquality');
-							}
-						});
+						updateStatus('badquality');
 					}
 				});
 			}
