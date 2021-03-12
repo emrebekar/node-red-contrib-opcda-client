@@ -1,11 +1,11 @@
 <script type="text/html" data-template-name="opcda-read">
 	<div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+	<div class="form-row">
         <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
         <input id="node-input-server" placeholder="Select OPC DA Server">
-    </div>
-    <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Group Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
     </div>
 	<div class="form-row">
 		<input type="checkbox" id="node-input-cache" style="display: inline-block; width: auto; vertical-align: top; margin-left:104px;" value="cache"> <span>Cache Read</span>
@@ -32,7 +32,7 @@
 </script>
 
 <script type="text/html" data-help-name="opcda-read">
-    <p>A simple node that converts the message payloads into all lower-case characters</p>
+    <p>Opcda Read Node. For more details please visit https://github.com/emrebekar/node-red-contrib-opcda-client</p>
 </script>
 
 <script type="text/javascript">

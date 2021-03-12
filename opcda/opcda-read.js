@@ -1,5 +1,7 @@
 module.exports = function(RED) {
 	const opcda = require('node-opc-da');
+	const { OPCServer } = opcda;
+    const { ComServer, Session, Clsid } = opcda.dcom;
 	
 	const errorCode = {
 		0x80040154 : "Clsid is not found.",
@@ -26,253 +28,309 @@ module.exports = function(RED) {
 	function OPCDARead(config) {
         RED.nodes.createNode(this,config);
 		let node = this;
-		let badCount = 5;
-		let groupStatus = "unknown";
+				
+		let server = RED.nodes.getNode(config.server);
+		let serverHandles, clientHandles;
 		
-		node.config = config;
-		
-		let serverNode = RED.nodes.getNode(config.server);
-		let opcSyncIO, opcItemMgr, opcGroup, serverHandles, clientHandles;
-		
-		let reading = false;
-		
-		if(!serverNode){
-			updateStatus("error");
-			node.error("Please select a server.")
+		node.opcServer = null;
+		node.comServer = null;
+
+		node.opcSyncIO = null;
+		node.opcItemMgr = null;
+
+		node.opcGroup = null;
+
+		node.isConnected = false;
+		node.isReading = false;
+
+		if(!server){
+			node.error("Please select a server.");
 			return;
 		}
+
+		if (!server.credentials) {
+            node.error("Failed to load credentials!");
+			return;
+        }	
+
+		node.updateStatus = function(status){		
+			switch(status){
+				case "disconnected":
+					node.status({fill:"red",shape:"ring",text:"Disconnected"});
+					break;
+				case "timeout":
+					node.status({fill:"red",shape:"ring",text:"Timeout"});
+					break;
+				case "connecting":
+					node.status({fill:"yellow",shape:"ring",text:"Connecting"});
+					break;
+				case "error":
+					node.status({fill:"red",shape:"ring",text:"Error"});
+					break;
+				case "noitem":
+					node.status({fill:"yellow",shape:"ring",text:"No Item"});
+					break;
+				case "badquality":
+					node.status({fill:"red",shape:"ring",text:"Bad Quality"});
+					break;
+				case "goodquality":
+					node.status({fill:"blue",shape:"ring",text:"Good Quality"});
+					break;
+				case "ready":
+					node.status({fill:"green",shape:"ring",text:"Ready"});
+					break;
+				case "reading":
+					node.status({fill:"blue",shape:"ring",text:"Reading"});
+					break;
+				case "mismatch":
+					node.status({fill:"yellow",shape:"ring",text:"Mismatch Data"});
+					break;
+				default:
+					node.status({fill:"grey",shape:"ring",text:"Unknown"});
+					break;
+			}
+		}
+
+		node.init = function(){
+			return new Promise(async function(resolve, reject){
+				if(!node.isConnected){
+
+					node.updateStatus('connecting');
 		
-		serverNode.registerGroupNode(node);	
-		serverNode.reconnect();
+					var timeout = parseInt(server.config.timeout);
+					var comSession = new Session();
+		
+					comSession = comSession.createSession(server.config.domain, server.credentials.username, server.credentials.password);
+					comSession.setGlobalSocketTimeout(timeout);
+	
+					node.tout = setTimeout(function(){
+						node.updateStatus("timeout");
+						reject("Connection Timeout");
+					}, timeout);
+		
+					node.comServer = new ComServer(new Clsid(server.config.clsid), server.config.address, comSession);	
+					await node.comServer.init();
+		
+					var comObject = await node.comServer.createInstance();
+					node.opcServer = new OPCServer();
+					await node.opcServer.init(comObject);
 
-		async function init(){
-			try{
-				serverHandles = [];
-				clientHandles = [];
-				reading = false;
-				
-				opcGroup = await serverNode.opcServer.addGroup(config.id, null);				
-				opcItemMgr = await opcGroup.getItemManager();
-				opcSyncIO = await opcGroup.getSyncIO();
-				
-				let clientHandle = 1;
-				var itemsList = config.groupitems.map(e => {
-					return { itemID: e, clientHandle: clientHandle++ };
-				});
-							
-				var addedItems = await opcItemMgr.add(itemsList);
+					clearTimeout(node.tout);
+			
+					serverHandles = [];
+					clientHandles = [];
+					
+					node.opcGroup = await node.opcServer.addGroup(config.id, null);				
+					node.opcItemMgr = await node.opcGroup.getItemManager();
+					node.opcSyncIO = await node.opcGroup.getSyncIO();
+					
+					let clientHandle = 1;
+					var itemsList = config.groupitems.map(e => {
+						return { itemID: e, clientHandle: clientHandle++ };
+					});
 								
-				for(let i=0; i < addedItems.length; i++ ){
-					const addedItem = addedItems[i];
-					const item = itemsList[i];
-
-					if (addedItem[0] !== 0) {
-						node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
-					} 
-					else {
-						serverHandles.push(addedItem[1].serverHandle);
-						clientHandles[item.clientHandle] = item.itemID;
+					var addedItems = await node.opcItemMgr.add(itemsList);
+									
+					for(let i=0; i < addedItems.length; i++ ){
+						const addedItem = addedItems[i];
+						const item = itemsList[i];
+		
+						if (addedItem[0] !== 0) {
+							node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
+						} 
+						else {
+							serverHandles.push(addedItem[1].serverHandle);
+							clientHandles[item.clientHandle] = item.itemID;
+						}
 					}
+	
+					node.isConnected = true;
+					node.updateStatus('ready');
+
+					resolve();
+				}
+			});
+		}
+	
+		node.destroy = function(){
+			return new Promise(async function(resolve){
+				if (node.opcSyncIO) {
+					await node.opcSyncIO.end();
+					node.opcSyncIO = null;
 				}
 				
-				updateStatus('ready');
-			}
-			catch(e){
-				updateStatus('error');
-                onError(e);
-				//await serverNode.reconnect();
-			}
-		}
-	
-		async function destroy(){
-			try {
-                if (opcSyncIO) {
-                    await opcSyncIO.end();
-                    opcSyncIO = null;
-                }
-                
-                if (opcItemMgr) {
-                    await opcItemMgr.end();
-                    opcItemMgr = null;
-                }
-                
-                if (opcGroup) {
-                    await opcGroup.end();
-                    opcGroup = null;
-                }
-            } 
-			catch (e) {
-				updateStatus('error');
-                onError(e);
-            }
-		}
-	
-		let oldValues = [];
-		async function readGroup(cache){
-			try{
+				if (node.opcItemMgr) {
+					await node.opcItemMgr.end();
+					node.opcItemMgr = null;
+				}
 				
-				reading = true;
-				var dataSource = cache ? opcda.constants.opc.dataSource.CACHE : opcda.constants.opc.dataSource.DEVICE;
+				if (node.opcGroup) {
+					await node.opcGroup.end();
+					node.opcGroup = null;
+				}
+	
+				if(node.opcServer){
+					node.opcServer.end();
+					node.opcServer = null;
+				}
+	
+				if(node.comServer){
+					node.comServer.closeStub();
+					node.comServer = null;
+				}
+	
+				node.isConnected = false;
+				clearTimeout(node.tout);
 
-				let valuesTmp = [];
-				await opcSyncIO.read(dataSource, serverHandles).then(function(valueSets){
-					
-					var datas = [];
-					
-					let changed = false;
-					let isGood = true;
+				resolve();
+			});
+		}
 
-					for(let i in valueSets){
-						
-						if(config.datachange){
-							if(!changed){
-								if(oldValues.length != valueSets.length || valueSets[i].value != oldValues[i]){
-									changed = true;
-								}
+		let oldValues = [];
+		node.readGroup = function readGroup(cache){
+			var dataSource = cache ? opcda.constants.opc.dataSource.CACHE : opcda.constants.opc.dataSource.DEVICE;
+
+			let valuesTmp = [];
+			node.isReading = true;
+			node.opcSyncIO.read(dataSource, serverHandles).then(valueSets => {
+					
+				var datas = [];
+				
+				let changed = false;
+				let isGood = true;
+
+				for(let i in valueSets){
+					
+					if(config.datachange){
+						if(!changed){
+							if(oldValues.length != valueSets.length || valueSets[i].value != oldValues[i]){
+								changed = true;
 							}
-							
-							valuesTmp[i] = valueSets[i].value;
-							oldValues[i] = valueSets[i].value;			
 						}
 						
-						var quality;
-						
-						if(valueSets[i].quality >= 0 && valueSets[i].quality < 64){
-							quality = "BAD";
-							isGood = false;
-						}
-						else if(valueSets[i].quality >= 64 && valueSets[i].quality < 192){
-							quality = "UNCERTAIN";
-							isGood = false;
-						}
-						else if(valueSets[i].quality >= 192 && valueSets[i].quality <= 219){
-							quality = "GOOD";
-						}
-						else{
-							quality = "UNKNOWN";
-							isGood = false;
-						}
-						
-						var data = {
-							itemID: clientHandles[valueSets[i].clientHandle],
-							errorCode: valueSets[i].errorCode,
-							quality: quality,
-							timestamp: valueSets[i].timestamp,
-							value: valueSets[i].value,
-						}
-						
-						datas.push(data);
+						valuesTmp[i] = valueSets[i].value;
+						oldValues[i] = valueSets[i].value;			
 					}
 					
-					if(isGood){
-						if(config.groupitems.length == datas.length){
-							updateStatus('goodquality');
-						}
-
-						if(config.groupitems.length != datas.length){
-							updateStatus('mismatch');
-						}
-
-						if(config.groupitems.length < 1){
-							updateStatus('noitem');
-						}
-
-						if(config.datachange){
-							oldValues = valuesTmp;
-							if(changed){
-								var msg = { payload: datas };
-								node.send(msg);						
-							}		
-						}
-
-						else{
-							var msg = { payload: datas };
-							node.send(msg);		
-						}	
+					var quality;
+					
+					if(valueSets[i].quality >= 0 && valueSets[i].quality < 64){
+						quality = "BAD";
+						isGood = false;
+					}
+					else if(valueSets[i].quality >= 64 && valueSets[i].quality < 192){
+						quality = "UNCERTAIN";
+						isGood = false;
+					}
+					else if(valueSets[i].quality >= 192 && valueSets[i].quality <= 219){
+						quality = "GOOD";
 					}
 					else{
-						updateStatus('badquality');
+						quality = "UNKNOWN";
+						isGood = false;
 					}
+					
+					var data = {
+						itemID: clientHandles[valueSets[i].clientHandle],
+						errorCode: valueSets[i].errorCode,
+						quality: quality,
+						timestamp: valueSets[i].timestamp,
+						value: valueSets[i].value,
+					}
+					
+					datas.push(data);
+				}
+				
+				if(isGood){
+					if(config.groupitems.length == datas.length){
+						node.updateStatus('goodquality');
+					}
+
+					if(config.groupitems.length != datas.length){
+						node.updateStatus('mismatch');
+					}
+
+					if(config.groupitems.length < 1){
+						node.updateStatus('noitem');
+					}
+
+					if(config.datachange){
+						oldValues = valuesTmp;
+						if(changed){
+							var msg = { payload: datas };
+							node.send(msg);						
+						}		
+					}
+
+					else{
+						var msg = { payload: datas };
+						node.send(msg);		
+					}	
+				}
+				else{
+					node.updateStatus('badquality');
+				}
+
+				node.isReading = false;
+			}).catch(e => {
+				node.error("opcda-error", e.message);
+				node.updateStatus("error");
+			});
+		}
+	
+		node.isReconnecting = false;
+		node.reconnect = async function(){
+			try{
+				if(!node.isReconnecting){
+					node.isReconnecting = true;
+					await node.destroy();
+					await new Promise(resolve => setTimeout(resolve, 3000));
+					await node.init();
+					node.isReconnecting = false;
+				}
+
+				node.comServer.on('disconnected',async function(){
+					node.isConnected = false;
+					node.updateStatus('disconnected');
+					await node.reconnect();
 				});
 			}
 			catch(e){
-				updateStatus('error');
-				onError(e);
-			}
-			finally{
-				reading = false;
-			}
-		}
-	
-		node.serverStatusChanged = async function serverStatusChanged(status){
-			updateStatus(status);
-			if(status == 'connected'){
-				await init();
-			}
-		}
-		
-		function updateStatus(status){
-						
-			if(groupStatus != status){
-				switch(status){
-					case "disconnected":
-						node.status({fill:"red",shape:"ring",text:"Disconnected"});
-						break;
-					case "connecting":
-						node.status({fill:"yellow",shape:"ring",text:"Connecting"});
-						break;
-					case "noitem":
-						node.status({fill:"yellow",shape:"ring",text:"No Item"});
-						break;
-					case "badquality":
-						node.status({fill:"red",shape:"ring",text:"Bad Quality"});
-						break;
-					case "goodquality":
-						node.status({fill:"blue",shape:"ring",text:"Good Quality"});
-						break;
-					case "ready":
-						node.status({fill:"green",shape:"ring",text:"Ready"});
-						break;
-					case "reading":
-						node.status({fill:"blue",shape:"ring",text:"Reading"});
-						break;
-					case "error":
-						node.status({fill:"red",shape:"ring",text:"Error"});
-						break;
-					case "mismatch":
-						node.status({fill:"yellow",shape:"ring",text:"Mismatch Data"});
-						break;
-					default:
-						node.status({fill:"grey",shape:"ring",text:"Unknown"});
-						break;
+				node.isReconnecting = false;
+				if(errorCode[e]){
+					node.updateStatus('error');
+					switch(e) {
+						case 0x00000005:
+						case 0xC0040010:
+						case 0x80040154:
+						case 0x00000061:
+							node.error(errorCode[e]);
+							return;
+						default:
+							node.error(errorCode[e]);
+							await node.reconnect();
+					}
 				}
+				else{
+					node.error(e);
+					await node.reconnect();
+				}				
 			}
+		}
+		
+		node.reconnect();
 
-			groupStatus = status;
-		}
-		
-		function onError(e){
-			var msg = errorMessage(e);
-			node.error(msg);
-		}
-		
-		function errorMessage(e){
-			var msg = errorCode[e] ? errorCode[e] : e.message;
-			return msg;
-		}
-		
-		node.on('input', function(msg){
-			if(serverNode.isConnected && !reading && opcSyncIO){
-				readGroup(config.cache);
+		node.on('input', function(){
+			if(node.isConnected && !node.isReading){
+				node.readGroup(config.cache);
 			}
         });	
 	
-		node.on('close', function(){
-			console.log("close");
-			destroy().then(()=>{
-				serverNode.removeGroupNode(config.id);
+		node.on('close', function(done){
+			node.status({});
+			node.destroy().then(function(){
+				done();
 			});
-			done();
 		});
 		
     }
