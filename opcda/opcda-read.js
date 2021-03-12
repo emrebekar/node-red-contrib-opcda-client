@@ -94,95 +94,103 @@ module.exports = function(RED) {
 		node.init = function(){
 			return new Promise(async function(resolve, reject){
 				if(!node.isConnected){
-
-					node.updateStatus('connecting');
+					try{
+						node.updateStatus('connecting');
 		
-					var timeout = parseInt(server.config.timeout);
-					var comSession = new Session();
-		
-					comSession = comSession.createSession(server.config.domain, server.credentials.username, server.credentials.password);
-					comSession.setGlobalSocketTimeout(timeout);
-	
-					node.tout = setTimeout(function(){
-						node.updateStatus("timeout");
-						reject("Connection Timeout");
-					}, timeout);
-		
-					node.comServer = new ComServer(new Clsid(server.config.clsid), server.config.address, comSession);	
-					await node.comServer.init();
-		
-					var comObject = await node.comServer.createInstance();
-					node.opcServer = new OPCServer();
-					await node.opcServer.init(comObject);
-
-					clearTimeout(node.tout);
+						var timeout = parseInt(server.config.timeout);
+						var comSession = new Session();
 			
-					serverHandles = [];
-					clientHandles = [];
-					
-					node.opcGroup = await node.opcServer.addGroup(config.id, null);				
-					node.opcItemMgr = await node.opcGroup.getItemManager();
-					node.opcSyncIO = await node.opcGroup.getSyncIO();
-					
-					let clientHandle = 1;
-					var itemsList = config.groupitems.map(e => {
-						return { itemID: e, clientHandle: clientHandle++ };
-					});
-								
-					var addedItems = await node.opcItemMgr.add(itemsList);
-									
-					for(let i=0; i < addedItems.length; i++ ){
-						const addedItem = addedItems[i];
-						const item = itemsList[i];
+						comSession = comSession.createSession(server.config.domain, server.credentials.username, server.credentials.password);
+						comSession.setGlobalSocketTimeout(timeout);
 		
-						if (addedItem[0] !== 0) {
-							node.warn(`Error adding item '${item.itemID}': ${errorMessage(addedItem[0])}`);
-						} 
-						else {
-							serverHandles.push(addedItem[1].serverHandle);
-							clientHandles[item.clientHandle] = item.itemID;
-						}
-					}
+						node.tout = setTimeout(function(){
+							node.updateStatus("timeout");
+							reject("Connection Timeout");
+						}, timeout);
+			
+						node.comServer = new ComServer(new Clsid(server.config.clsid), server.config.address, comSession);	
+						await node.comServer.init();
+			
+						var comObject = await node.comServer.createInstance();
+						node.opcServer = new OPCServer();
+						await node.opcServer.init(comObject);
 	
-					node.isConnected = true;
-					node.updateStatus('ready');
+						clearTimeout(node.tout);
 
-					resolve();
+						serverHandles = [];
+						clientHandles = [];
+						
+						node.opcGroup = await node.opcServer.addGroup(config.id, null);				
+						node.opcItemMgr = await node.opcGroup.getItemManager();
+						node.opcSyncIO = await node.opcGroup.getSyncIO();
+						
+						let clientHandle = 1;
+						var itemsList = config.groupitems.map(e => {
+							return { itemID: e, clientHandle: clientHandle++ };
+						});
+									
+						var addedItems = await node.opcItemMgr.add(itemsList);
+										
+						for(let i=0; i < addedItems.length; i++ ){
+							const addedItem = addedItems[i];
+							const item = itemsList[i];
+			
+							if (addedItem[0] !== 0) {
+								node.warn(`Error adding item '${item.itemID}'`);
+							} 
+							else {
+								serverHandles.push(addedItem[1].serverHandle);
+								clientHandles[item.clientHandle] = item.itemID;
+							}
+						}
+		
+						node.isConnected = true;
+						node.updateStatus('ready');
+	
+						resolve();
+					}
+					catch(e){
+						reject(e);
+					}
 				}
 			});
 		}
 	
 		node.destroy = function(){
 			return new Promise(async function(resolve){
-				if (node.opcSyncIO) {
-					await node.opcSyncIO.end();
-					node.opcSyncIO = null;
-				}
-				
-				if (node.opcItemMgr) {
-					await node.opcItemMgr.end();
-					node.opcItemMgr = null;
-				}
-				
-				if (node.opcGroup) {
-					await node.opcGroup.end();
-					node.opcGroup = null;
-				}
-	
-				if(node.opcServer){
-					node.opcServer.end();
-					node.opcServer = null;
-				}
-	
-				if(node.comServer){
-					node.comServer.closeStub();
-					node.comServer = null;
-				}
-	
-				node.isConnected = false;
-				clearTimeout(node.tout);
+				try{
+					node.isConnected = false;
 
-				resolve();
+					if (node.opcSyncIO) {
+						await node.opcSyncIO.end();
+						node.opcSyncIO = null;
+					}
+					
+					if (node.opcItemMgr) {
+						await node.opcItemMgr.end();
+						node.opcItemMgr = null;
+					}
+					
+					if (node.opcGroup) {
+						await node.opcGroup.end();
+						node.opcGroup = null;
+					}
+		
+					if(node.opcServer){
+						node.opcServer.end();
+						node.opcServer = null;
+					}
+		
+					if(node.comServer){
+						node.comServer.closeStub();
+						node.comServer = null;
+					}
+		
+					resolve();
+				}
+				catch(e){
+					reject(e);
+				}	
 			});
 		}
 
@@ -275,6 +283,7 @@ module.exports = function(RED) {
 			}).catch(e => {
 				node.error("opcda-error", e.message);
 				node.updateStatus("error");
+				node.reconnect();
 			});
 		}
 	

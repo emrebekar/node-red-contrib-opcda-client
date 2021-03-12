@@ -98,72 +98,81 @@ module.exports = function(RED) {
 			return new Promise(async function(resolve, reject){
 				if(!node.isConnected){
 
-					node.updateStatus('connecting');
-					node.warn(server.config);
-					var timeout = parseInt(server.config.timeout);
-					var comSession = new Session();
-					comSession = comSession.createSession(server.config.domain, server.credentials.username, server.credentials.password);
-					comSession.setGlobalSocketTimeout(timeout);
-
-					node.tout = setTimeout(function(){
-						node.updateStatus("timeout");
-						reject("Connection Timeout");
-					}, timeout);
-		
-					node.comServer = new ComServer(new Clsid(server.config.clsid), server.config.address, comSession);	
-					await node.comServer.init();
-		
-					var comObject = await node.comServer.createInstance();
-					node.opcServer = new OPCServer();
-					await node.opcServer.init(comObject);
-
-					clearTimeout(node.tout);
-			
-					serverHandles = [];
-					clientHandles = [];
-					node.opcGroup = await node.opcServer.addGroup(config.id, null);				
-					node.opcItemMgr = await node.opcGroup.getItemManager();
-					node.opcSyncIO = await node.opcGroup.getSyncIO();
+					try{
+						node.updateStatus('connecting');
+						var timeout = parseInt(server.config.timeout);
+						var comSession = new Session();
+						comSession = comSession.createSession(server.config.domain, server.credentials.username, server.credentials.password);
+						comSession.setGlobalSocketTimeout(timeout);
 	
-					node.isConnected = true;
-					node.warn("Ready");
-
-					node.updateStatus('ready');
-
-					resolve();
+						node.tout = setTimeout(function(){
+							node.updateStatus("timeout");
+							reject("Connection Timeout");
+						}, timeout);
+			
+						node.comServer = new ComServer(new Clsid(server.config.clsid), server.config.address, comSession);	
+						await node.comServer.init();
+			
+						var comObject = await node.comServer.createInstance();
+						node.opcServer = new OPCServer();
+						await node.opcServer.init(comObject);
+	
+						clearTimeout(node.tout);
+				
+						serverHandles = [];
+						clientHandles = [];
+						node.opcGroup = await node.opcServer.addGroup(config.id, null);				
+						node.opcItemMgr = await node.opcGroup.getItemManager();
+						node.opcSyncIO = await node.opcGroup.getSyncIO();
+		
+						node.isConnected = true;
+	
+						node.updateStatus('ready');
+	
+						resolve();
+					}
+					catch(e){
+						reject(e);
+					}	
 				}
 			});
 		}
 	
 		node.destroy = function(){
 			return new Promise(async function(resolve){
-				if (node.opcSyncIO) {
-					await node.opcSyncIO.end();
-					node.opcSyncIO = null;
+				try{
+					node.isConnected = false;
+
+					if (node.opcSyncIO) {
+						await node.opcSyncIO.end();
+						node.opcSyncIO = null;
+					}
+					
+					if (node.opcItemMgr) {
+						await node.opcItemMgr.end();
+						node.opcItemMgr = null;
+					}
+					
+					if (node.opcGroup) {
+						await node.opcGroup.end();
+						node.opcGroup = null;
+					}
+		
+					if(node.opcServer){
+						node.opcServer.end();
+						node.opcServer = null;
+					}
+		
+					if(node.comServer){
+						node.comServer.closeStub();
+						node.comServer = null;
+					}
+		
+					resolve();
 				}
-				
-				if (node.opcItemMgr) {
-					await node.opcItemMgr.end();
-					node.opcItemMgr = null;
+				catch(e){
+					reject(e);
 				}
-				
-				if (node.opcGroup) {
-					await node.opcGroup.end();
-					node.opcGroup = null;
-				}
-	
-				if(node.opcServer){
-					node.opcServer.end();
-					node.opcServer = null;
-				}
-	
-				if(node.comServer){
-					node.comServer.closeStub();
-					node.comServer = null;
-				}
-	
-				node.isConnected = false;
-				resolve();
 			});
 		}
 		
@@ -181,7 +190,7 @@ module.exports = function(RED) {
 						var addedItem = await node.opcItemMgr.add(item);
 
 						if ((addedItem[0])[0] !== 0) {
-							node.warn(`Error adding item '${item[0].itemID}': ${errorMessage((addedItem[0])[0])}`);
+							node.warn(`Error adding item '${item[0].itemID}'`);
 						} 
 
 						else {
@@ -208,6 +217,8 @@ module.exports = function(RED) {
 			catch(e){
 				node.error("opcda-error", e.message);
 				node.updateStatus('error');
+
+				node.reconnect();
 
 				var msg = { payload: false };
 				node.send(msg);	
